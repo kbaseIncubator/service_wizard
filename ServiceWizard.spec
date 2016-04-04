@@ -26,9 +26,9 @@ module ServiceWizard {
     } ServiceStatus;
 
 
-    funcdef start_service(Service service) returns () authentication required;
-    funcdef stop_service(Service service) returns () authentication required;
-    funcdef pause_service(Service service) returns () authentication required;
+    funcdef start(Service service) returns () authentication required;
+    funcdef stop(Service service) returns () authentication required;
+    funcdef pause(Service service) returns () authentication required;
 
 
 
