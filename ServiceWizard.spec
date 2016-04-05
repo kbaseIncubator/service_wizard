@@ -2,6 +2,7 @@
 
 module ServiceWizard {
     
+    typedef int boolean;
 
     typedef structure {
         string module_name;
