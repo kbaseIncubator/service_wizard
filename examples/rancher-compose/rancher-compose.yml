@@ -1,0 +1,3 @@
+nginxtest:
+  scale: 1
+
