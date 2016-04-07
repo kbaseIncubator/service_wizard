@@ -1,0 +1,12 @@
+{    
+    "version":"1.1",
+    "method":"ServiceWizard.start",
+    "context": null,
+    "params":[     
+            {
+              "module_name": "onerepotest",
+              "semantic_version": "11111",
+              "hash": "b7636c3f8d16491593900dd5cc89897b54e7856a"
+            }
+    ]    
+}

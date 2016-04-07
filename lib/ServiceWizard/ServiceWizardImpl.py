@@ -1,6 +1,9 @@
 #BEGIN_HEADER
+import os
 import yaml
 import subprocess
+from  pprint import pprint
+import traceback
 #END_HEADER
 
 
@@ -30,42 +33,72 @@ class ServiceWizard:
         #END_CONSTRUCTOR
         pass
 
-    def start_service(self, ctx, service):
+    def start(self, ctx, service):
         # ctx is the context object
-        #BEGIN start_service
-	docker_compose = { service.hash : {
-	           "image" : "rancher/dns-service",
-		   "links" : ["{0}:{1}".format(service.module_name,service.module_name)]
-	         }, 
-	         service.module_name : {
-		   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service.module_name,service.hash)
-		 }
-	       }
+        #BEGIN start
+        docker_compose = { service['hash'] : {
+                   "image" : "rancher/dns-service",
+                   "links" : ["{0}:{1}".format(service['module_name'],service['module_name'])]
+                 },
+                 service['module_name'] : {
+                   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service['module_name'],service['hash'])
+                 }
+               }
         with open('docker-compose.yml', 'w') as outfile:
-	    outfile.write( yaml.dump(docker_compose, default_flow_style=False) )
-	# can be extended later
+            outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
+        # can be extended later
         with open('rancher-compose.yml', 'w') as outfile:
-	    outfile.write( yaml.dump({service.module_name:{'scale':1}}, default_flow_style=False) )
-	eenv = os.environ.copy()
-	eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
-	eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
-	eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secrete-key']
-	cmd_list = ['bin/rancher-compose', '-p', service.module_name, 'up', '-d']
-	tool_process = subprocess.Popen(" ".join(cmd_list), stderr=subprocess.PIPE)
-	stdout, stderr = tool_process.communicate()
-        #END start_service
+            outfile.write( yaml.safe_dump({service['module_name']:{'scale':1}}, default_flow_style=False) )
+        eenv = os.environ.copy()
+        eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
+        eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
+        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secrete-key']
+        cmd_list = ['./bin/rancher-compose', '-p', service['module_name'], 'up', '-d']
+        try:
+            tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
+            stdout, stderr = tool_process.communicate()
+            pprint(stdout)
+            pprint(stderr)
+        except:
+            pprint(traceback.format_exc())
+        #END start
         pass
 
-    def stop_service(self, ctx, service):
+    def stop(self, ctx, service):
         # ctx is the context object
-        #BEGIN stop_service
-        #END stop_service
+        #BEGIN stop
+        docker_compose = { service['hash'] : {
+                   "image" : "rancher/dns-service",
+                   "links" : ["{0}:{1}".format(service['module_name'],service['module_name'])]
+                 },
+                 service['module_name'] : {
+                   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service['module_name'],service['hash'])
+                 }
+               }
+        with open('docker-compose.yml', 'w') as outfile:
+            outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
+        # can be extended later
+        with open('rancher-compose.yml', 'w') as outfile:
+            outfile.write( yaml.safe_dump({service['module_name']:{'scale':1}}, default_flow_style=False) )
+        eenv = os.environ.copy()
+        eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
+        eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
+        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secrete-key']
+        cmd_list = ['./bin/rancher-compose', '-p', service['module_name'], 'stop', '-d']
+        try:
+            tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
+            stdout, stderr = tool_process.communicate()
+            pprint(stdout)
+            pprint(stderr)
+        except:
+            pprint(traceback.format_exc())
+        #END stop
         pass
 
-    def pause_service(self, ctx, service):
+    def pause(self, ctx, service):
         # ctx is the context object
-        #BEGIN pause_service
-        #END pause_service
+        #BEGIN pause
+        #END pause
         pass
 
     def list_service_status(self, ctx, params):
