@@ -1,0 +1,11 @@
+nginxtest:
+  ports:
+  - 7445:443/tcp
+  log_driver: ''
+  entrypoint:
+  - nginx
+  - -g
+  - daemon off;
+  log_opt: {}
+  image: rancher_www
+

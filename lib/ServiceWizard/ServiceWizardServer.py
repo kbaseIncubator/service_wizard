@@ -61,15 +61,15 @@ class JSONObjectEncoder(json.JSONEncoder):
 sync_methods = {}
 async_run_methods = {}
 async_check_methods = {}
-async_run_methods['ServiceWizard.start_service_async'] = ['ServiceWizard', 'start_service']
-async_check_methods['ServiceWizard.start_service_check'] = ['ServiceWizard', 'start_service']
-sync_methods['ServiceWizard.start_service'] = True
-async_run_methods['ServiceWizard.stop_service_async'] = ['ServiceWizard', 'stop_service']
-async_check_methods['ServiceWizard.stop_service_check'] = ['ServiceWizard', 'stop_service']
-sync_methods['ServiceWizard.stop_service'] = True
-async_run_methods['ServiceWizard.pause_service_async'] = ['ServiceWizard', 'pause_service']
-async_check_methods['ServiceWizard.pause_service_check'] = ['ServiceWizard', 'pause_service']
-sync_methods['ServiceWizard.pause_service'] = True
+async_run_methods['ServiceWizard.start_async'] = ['ServiceWizard', 'start']
+async_check_methods['ServiceWizard.start_check'] = ['ServiceWizard', 'start']
+sync_methods['ServiceWizard.start'] = True
+async_run_methods['ServiceWizard.stop_async'] = ['ServiceWizard', 'stop']
+async_check_methods['ServiceWizard.stop_check'] = ['ServiceWizard', 'stop']
+sync_methods['ServiceWizard.stop'] = True
+async_run_methods['ServiceWizard.pause_async'] = ['ServiceWizard', 'pause']
+async_check_methods['ServiceWizard.pause_check'] = ['ServiceWizard', 'pause']
+sync_methods['ServiceWizard.pause'] = True
 async_run_methods['ServiceWizard.list_service_status_async'] = ['ServiceWizard', 'list_service_status']
 async_check_methods['ServiceWizard.list_service_status_check'] = ['ServiceWizard', 'list_service_status']
 sync_methods['ServiceWizard.list_service_status'] = True
@@ -347,18 +347,18 @@ class Application(object):
         self.serverlog.set_log_level(6)
         self.rpc_service = JSONRPCServiceCustom()
         self.method_authentication = dict()
-        self.rpc_service.add(impl_ServiceWizard.start_service,
-                             name='ServiceWizard.start_service',
+        self.rpc_service.add(impl_ServiceWizard.start,
+                             name='ServiceWizard.start',
                              types=[dict])
-        self.method_authentication['ServiceWizard.start_service'] = 'required'
-        self.rpc_service.add(impl_ServiceWizard.stop_service,
-                             name='ServiceWizard.stop_service',
+        self.method_authentication['ServiceWizard.start'] = 'required'
+        self.rpc_service.add(impl_ServiceWizard.stop,
+                             name='ServiceWizard.stop',
                              types=[dict])
-        self.method_authentication['ServiceWizard.stop_service'] = 'required'
-        self.rpc_service.add(impl_ServiceWizard.pause_service,
-                             name='ServiceWizard.pause_service',
+        self.method_authentication['ServiceWizard.stop'] = 'required'
+        self.rpc_service.add(impl_ServiceWizard.pause,
+                             name='ServiceWizard.pause',
                              types=[dict])
-        self.method_authentication['ServiceWizard.pause_service'] = 'required'
+        self.method_authentication['ServiceWizard.pause'] = 'required'
         self.rpc_service.add(impl_ServiceWizard.list_service_status,
                              name='ServiceWizard.list_service_status',
                              types=[dict])
