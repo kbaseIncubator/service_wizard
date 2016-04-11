@@ -41,12 +41,13 @@ class ServiceWizard:
     def start(self, ctx, service):
         # ctx is the context object
         #BEGIN start
-        docker_compose = { service['hash'] : {
+        shash = service['version'] #TODO: need to convert service version to hash
+        docker_compose = { shash : {
                    "image" : "rancher/dns-service",
                    "links" : ["{0}:{1}".format(service['module_name'],service['module_name'])]
                  },
                  service['module_name'] : {
-                   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service['module_name'],service['hash'])
+                   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service['module_name'],shash)
                  }
                }
         with open('docker-compose.yml', 'w') as outfile:
@@ -72,12 +73,13 @@ class ServiceWizard:
     def stop(self, ctx, service):
         # ctx is the context object
         #BEGIN stop
-        docker_compose = { service['hash'] : {
+        shash = service['version'] #TODO: need to convert service version to hash
+        docker_compose = { shash : {
                    "image" : "rancher/dns-service",
                    "links" : ["{0}:{1}".format(service['module_name'],service['module_name'])]
                  },
                  service['module_name'] : {
-                   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service['module_name'],service['hash'])
+                   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service['module_name'],shash)
                  }
                }
         with open('docker-compose.yml', 'w') as outfile:
