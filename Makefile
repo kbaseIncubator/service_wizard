@@ -12,6 +12,9 @@ EXECUTABLE_SCRIPT_NAME = run_$(SERVICE_CAPS)_async_job.sh
 STARTUP_SCRIPT_NAME = start_server.sh
 TEST_SCRIPT_NAME = run_tests.sh
 KB_RUNTIME ?= /kb/runtime
+JARS_DIR = $(TARGET)/lib/jars
+ANT = $(KB_RUNTIME)/ant/bin/ant
+
 
 .PHONY: test
 
@@ -58,6 +61,9 @@ build-test-script:
 
 test:
 	bash $(TEST_DIR)/$(TEST_SCRIPT_NAME)
+
+test-generic-clients:
+	$(ANT) test-generic-clients -Djars.dir=$(JARS_DIR)
 
 clean:
 	rm -rfv $(LBIN_DIR)
