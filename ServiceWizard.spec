@@ -4,10 +4,13 @@ module ServiceWizard {
     
     typedef int boolean;
 
+    /*
+        version - unified version field including semantic version, git commit hash and
+            case of last version of tag (dev/beta/release).
+    */
     typedef structure {
         string module_name;
-        string semantic_version;
-        string hash;
+        string version;
     } Service;
 
 
