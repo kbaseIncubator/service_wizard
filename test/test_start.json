@@ -5,8 +5,7 @@
     "params":[     
             {
               "module_name": "onerepotest",
-              "semantic_version": "11111",
-              "hash": "b7636c3f8d16491593900dd5cc89897b54e7856a"
+              "version": "b7636c3f8d16491593900dd5cc89897b54e7856a"
             }
     ]    
 }
