@@ -54,12 +54,7 @@ public class GenericClientsTest {
         List<Object> args = new ArrayList<Object>();
         Map<String, Object> arg1 = new LinkedHashMap<String, Object>();
         args.add(arg1);
-        List<Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>>> ret = 
-                cl.syncCall("Workspace.list_workspace_info", null, new TypeReference<List<
-                        List<Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>>>>>() {}, false, null, args).get(0);
-        for (Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>> info : ret) {
-            Assert.assertTrue(info.getE2().length() > 0);
-        }
+        checkWsListInfoResults(cl.syncCall("Workspace.list_workspace_info", null, new TypeReference<Object>() {}, false, null, args));
     }
     
     @Test
@@ -89,14 +84,55 @@ public class GenericClientsTest {
         File errorFile = new File(workDir, "tester.err");
         int exitCode = exec(workDir, outputFile, errorFile, "bash", shellFile.getCanonicalPath());
         if (exitCode == 0) {
-            List<List<Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>>>> ret = 
-                    UObject.getMapper().readValue(outputFile, new TypeReference<List<
-                            List<Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>>>>>() {});
-            for (Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>> info : ret.get(0)) {
-                Assert.assertTrue(info.getE2().length() > 0);
-            }
+            checkWsListInfoResults(UObject.getMapper().readValue(outputFile, Object.class));
         } else {
             throw new IllegalStateException("Error running python test code: " + readText(errorFile));
+        }
+    }
+    
+    @Test
+    public void testJavascript() throws Exception {
+        File clientFile = new File("lib/kbaseclients/GenericClient.js");
+        File jqLib = new File("test/js_deps/jquery-1.10.2.min.js");
+        File workDir = prepareWorkDir("javascript_generic_client");
+        File testerFile = new File(workDir, "tester.js");
+        List<String> lines = new ArrayList<String>(Arrays.asList(
+                "phantom.injectJs('" + jqLib.getCanonicalPath() + "');",
+                "phantom.injectJs('" + clientFile.getCanonicalPath() + "');",
+                "var client = new GenericClient('http://localhost:" + serviceWizardPort + "');",
+                "client.sync_call('Workspace.list_workspace_info', [{}], function(ret) {",
+                "    console.log(JSON.stringify(ret));",
+                "    phantom.exit();",
+                "}, function(error) {",
+                "    console.error(JSON.stringify(error));",
+                "    phantom.exit();",
+                "});"
+                ));
+        writeFileLines(lines, testerFile);
+        File shellFile = new File(workDir, "tester.sh");
+        lines = new ArrayList<String>(Arrays.asList(
+                "#!/bin/bash",
+                "phantomjs " + testerFile.getCanonicalPath()
+                ));
+        writeFileLines(lines, shellFile);
+        File outputFile = new File(workDir, "tester.out");
+        File errorFile = new File(workDir, "tester.err");
+        int exitCode = exec(workDir, outputFile, errorFile, "bash", shellFile.getCanonicalPath());
+        if (exitCode == 0) {
+            checkWsListInfoResults(UObject.getMapper().readValue(outputFile, Object.class));
+        } else {
+            throw new IllegalStateException("Error running javascript test code: " + readText(errorFile));
+        }
+    }
+    
+    private static void checkWsListInfoResults(Object obj) {
+        List<List<Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>>>> ret =
+                UObject.transformObjectToObject(obj, new TypeReference<List<
+                        List<Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>>>>>() {});
+        Assert.assertEquals(1, ret.size());
+        Assert.assertTrue(ret.get(0).size() > 0);
+        for (Tuple9<Long, String, String, String, Long, String, String, String, Map<String,String>> info : ret.get(0)) {
+            Assert.assertTrue(info.getE2().length() > 0);
         }
     }
     
@@ -162,6 +198,7 @@ public class GenericClientsTest {
     }
     
     private static Thread readInNewThread(final InputStream is, File output) throws Exception {
+        @SuppressWarnings("resource")
         final PrintWriter pw = output == null ? null : new PrintWriter(new FileWriter(output));
         Thread ret = new Thread(new Runnable() {
             public void run() {
