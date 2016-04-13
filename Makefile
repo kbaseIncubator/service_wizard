@@ -14,6 +14,9 @@ TEST_SCRIPT_NAME = run_tests.sh
 KB_RUNTIME ?= /kb/runtime
 JARS_DIR = $(TARGET)/lib/jars
 ANT = $(KB_RUNTIME)/ant/bin/ant
+TOP_DIR = $(shell python -c "import os.path as p; print(p.abspath('../..'))")
+TOP_DIR_NAME = $(shell basename $(TOP_DIR))
+
 
 
 .PHONY: test
@@ -37,6 +40,11 @@ install-deps:
 	do                                 \
 		bash $$i;                  \
 	done;
+	mkdir -p lib/biokbase
+	rsync  -av $(TARGET)/lib/biokbase/__init__.py lib/biokbase/.
+	rsync  -av $(TARGET)/lib/biokbase/auth.py lib/biokbase/.
+	rsync  -av $(TARGET)/lib/biokbase/log.py lib/biokbase/.
+	rsync  -av $(TARGET)/lib/biokbase/nexus lib/biokbase/.
 
 
 build-executable-script:
@@ -66,6 +74,9 @@ build-test-script:
 	echo 'cd $$script_dir/../$(TEST_DIR)' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
 	echo 'python -u -m unittest discover -p "*_test.py"' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
 	chmod +x $(TEST_DIR)/$(TEST_SCRIPT_NAME)
+
+
+
 
 test:
 	bash $(TEST_DIR)/$(TEST_SCRIPT_NAME)
