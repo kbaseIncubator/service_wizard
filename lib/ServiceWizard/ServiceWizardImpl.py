@@ -54,7 +54,7 @@ class ServiceWizard:
                    "links" : ["{0}:{1}".format(service['module_name'],service['module_name'])]
                  },
                  service['module_name'] : {
-                   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service['module_name'],shash)
+                   "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url'],service['module_name'],shash)
                  }
                }
         with open('docker-compose.yml', 'w') as outfile:
@@ -86,7 +86,7 @@ class ServiceWizard:
                    "links" : ["{0}:{1}".format(service['module_name'],service['module_name'])]
                  },
                  service['module_name'] : {
-                   "image" : "dockerhub-ci.kbase.us/kbase:{0}.{1}".format(service['module_name'],shash)
+                   "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url',service['module_name'],shash)
                  }
                }
         with open('docker-compose.yml', 'w') as outfile:
@@ -141,7 +141,7 @@ class ServiceWizard:
                       es['up'] = 1
                     else:
                       es['up'] = 0
-                    es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['ngix-port'], entry['name'], es['hash'])
+                    es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], entry['name'], es['hash'])
                     result.append(es)
         returnVal = result
         #END list_service_status
@@ -183,7 +183,7 @@ class ServiceWizard:
                       es['up'] = 1
                     else:
                       es['up'] = 0
-                    es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['ngix-port'], entry['name'], es['hash'])
+                    es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], entry['name'], es['hash'])
                     returnVal = es
         #END get_service_status
 
