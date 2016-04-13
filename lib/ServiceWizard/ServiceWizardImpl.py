@@ -9,6 +9,7 @@ import json
 import zipfile
 from StringIO import StringIO
 import re
+from urlparse import urlparse
 #END_HEADER
 
 
@@ -35,6 +36,12 @@ class ServiceWizard:
     def __init__(self, config):
         #BEGIN_CONSTRUCTOR
         self.deploy_config = config
+        if 'svc-hostname' not in config:
+            up = urlparse(config['rancher-env-url'])
+            self.deploy_config['svc-hostname'] = up.hostname
+        if 'ngix-port' not in config:
+            self.deploy_config['ngix-port'] = 7443
+        
         #END_CONSTRUCTOR
         pass
 
@@ -58,7 +65,7 @@ class ServiceWizard:
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
-        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secrete-key']
+        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
         cmd_list = ['./bin/rancher-compose', '-p', service['module_name'], 'up', '-d']
         try:
             tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
@@ -90,7 +97,7 @@ class ServiceWizard:
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
-        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secrete-key']
+        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
         cmd_list = ['./bin/rancher-compose', '-p', service['module_name'], 'stop']
         try:
             tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
@@ -114,13 +121,14 @@ class ServiceWizard:
         #BEGIN list_service_status
         client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
                       access_key=self.deploy_config['access-key'],
-                      secret_key=self.deploy_config['secrete-key'])
+                      secret_key=self.deploy_config['secret-key'])
         slist = client.list('environment')
 
         result = []
         for entry in slist:
           if entry['type'] == 'environment':
             es = {'module_name' : entry['name'], 'status' : entry['state'], 'health' : entry['healthState']}
+            # the following will be changed later but only for now
             sr = client._session.get("{0}/environments/{1}/composeconfig".format(self.deploy_config['rancher-env-url'], entry['id']), auth=client._auth, params=None, headers=client._headers)
             if sr.ok: 
               dc=yaml.load(zipfile.ZipFile(StringIO(sr.content), "r").read('docker-compose.yml'))
@@ -133,6 +141,7 @@ class ServiceWizard:
                       es['up'] = 1
                     else:
                       es['up'] = 0
+                    es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['ngix-port'], entry['name'], es['hash'])
                     result.append(es)
         returnVal = result
         #END list_service_status
@@ -148,6 +157,34 @@ class ServiceWizard:
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN get_service_status
+        shash = service['version'] #TODO: need to convert service version to hash
+        client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
+                      access_key=self.deploy_config['access-key'],
+                      secret_key=self.deploy_config['secret-key'])
+        slist = client.list('environment')
+
+        returnVal = None
+        for entry in slist:
+          if entry['type'] == 'environment':
+            if entry['name'] != service['name']:
+              continue
+            es = {'module_name' : entry['name'], 'status' : entry['state'], 'health' : entry['healthState']}
+            # the following will be changed later but only for now
+            sr = client._session.get("{0}/environments/{1}/composeconfig".format(self.deploy_config['rancher-env-url'], entry['id']), auth=client._auth, params=None, headers=client._headers)
+            if sr.ok: 
+              dc=yaml.load(zipfile.ZipFile(StringIO(sr.content), "r").read('docker-compose.yml'))
+              if entry['name'] in dc and 'image' in dc[entry['name']] and re.match(r'^dockerhub-', dc[entry['name']]['image']):
+                for hk in dc.keys():
+                  if hk != entry['name']:
+                    if hk != shash: continue
+                    es['hash'] = hk
+                    #if es['health'] == 'healthy' and es['status'] == 'active':
+                    if es['status'] == 'active':
+                      es['up'] = 1
+                    else:
+                      es['up'] = 0
+                    es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['ngix-port'], entry['name'], es['hash'])
+                    returnVal = es
         #END get_service_status
 
         # At some point might do deeper type checking...
