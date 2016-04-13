@@ -18,9 +18,10 @@ ANT = $(KB_RUNTIME)/ant/bin/ant
 
 .PHONY: test
 
-default: compile build-startup-script build-executable-script build-test-script
+default: compile install-deps build-startup-script build-executable-script build-test-script
 
 compile:
+	mkdir -p $(LBIN_DIR)
 	kb-sdk compile $(SPEC_FILE) \
 		--out $(LIB_DIR) \
 		--plclname $(SERVICE_CAPS)::$(SERVICE_CAPS)Client \
@@ -30,7 +31,13 @@ compile:
 		--java \
 		--pysrvname $(SERVICE_CAPS).$(SERVICE_CAPS)Server \
 		--pyimplname $(SERVICE_CAPS).$(SERVICE_CAPS)Impl;
-	chmod +x $(SCRIPTS_DIR)/entrypoint.sh
+
+install-deps:
+	for i in `find deps -name '*.sh'`; \
+	do                                 \
+		bash $$i;                  \
+	done;
+
 
 build-executable-script:
 	mkdir -p $(LBIN_DIR)
@@ -42,6 +49,7 @@ build-executable-script:
 
 build-startup-script:
 	mkdir -p $(LBIN_DIR)
+	mkdir -p $(SCRIPTS_DIR)
 	echo '#!/bin/bash' > $(SCRIPTS_DIR)/$(STARTUP_SCRIPT_NAME)
 	echo 'script_dir=$$(dirname "$$(readlink -f "$$0")")' >> $(SCRIPTS_DIR)/$(STARTUP_SCRIPT_NAME)
 	echo 'export KB_DEPLOYMENT_CONFIG=$$script_dir/../deploy.cfg' >> $(SCRIPTS_DIR)/$(STARTUP_SCRIPT_NAME)
