@@ -39,8 +39,8 @@ class ServiceWizard:
         if 'svc-hostname' not in config:
             up = urlparse(config['rancher-env-url'])
             self.deploy_config['svc-hostname'] = up.hostname
-        if 'ngix-port' not in config:
-            self.deploy_config['ngix-port'] = 7443
+        if 'nginx-port' not in config:
+            self.deploy_config['nginx-port'] = 443
         
         #END_CONSTRUCTOR
         pass
