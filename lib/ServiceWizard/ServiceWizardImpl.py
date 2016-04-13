@@ -65,7 +65,7 @@ class ServiceWizard:
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
-        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secrete-key']
+        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
         cmd_list = ['./bin/rancher-compose', '-p', service['module_name'], 'up', '-d']
         try:
             tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
@@ -97,7 +97,7 @@ class ServiceWizard:
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
-        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secrete-key']
+        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
         cmd_list = ['./bin/rancher-compose', '-p', service['module_name'], 'stop']
         try:
             tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
@@ -121,7 +121,7 @@ class ServiceWizard:
         #BEGIN list_service_status
         client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
                       access_key=self.deploy_config['access-key'],
-                      secret_key=self.deploy_config['secrete-key'])
+                      secret_key=self.deploy_config['secret-key'])
         slist = client.list('environment')
 
         result = []
@@ -160,7 +160,7 @@ class ServiceWizard:
         shash = service['version'] #TODO: need to convert service version to hash
         client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
                       access_key=self.deploy_config['access-key'],
-                      secret_key=self.deploy_config['secrete-key'])
+                      secret_key=self.deploy_config['secret-key'])
         slist = client.list('environment')
 
         returnVal = None
