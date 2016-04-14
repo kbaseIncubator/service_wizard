@@ -49,11 +49,12 @@ class ServiceWizard:
         # ctx is the context object
         #BEGIN start
         shash = service['version'] #TODO: need to convert service version to hash
+        sname = "{0}-{1}".format(service['module_name'],shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
-                   "links" : ["{0}:{1}".format(service['module_name'],service['module_name'])]
+                   "links" : ["{0}:{0}".format(sname)]
                  },
-                 service['module_name'] : {
+                 sname : {
                    "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url'],service['module_name'],shash)
                  }
                }
@@ -61,7 +62,7 @@ class ServiceWizard:
             outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
         # can be extended later
         with open('rancher-compose.yml', 'w') as outfile:
-            outfile.write( yaml.safe_dump({service['module_name']:{'scale':1}}, default_flow_style=False) )
+            outfile.write( yaml.safe_dump({sname:{'scale':1}}, default_flow_style=False) )
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
@@ -81,19 +82,20 @@ class ServiceWizard:
         # ctx is the context object
         #BEGIN stop
         shash = service['version'] #TODO: need to convert service version to hash
+        sname = "{0}-{1}".format(service['module_name'],shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
-                   "links" : ["{0}:{1}".format(service['module_name'],service['module_name'])]
+                   "links" : ["{0}:{0}".format(sname)]
                  },
-                 service['module_name'] : {
-                   "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url',service['module_name'],shash)
+                 sname : {
+                   "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url'],service['module_name'],shash)
                  }
                }
         with open('docker-compose.yml', 'w') as outfile:
             outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
         # can be extended later
         with open('rancher-compose.yml', 'w') as outfile:
-            outfile.write( yaml.safe_dump({service['module_name']:{'scale':1}}, default_flow_style=False) )
+            outfile.write( yaml.safe_dump({sname:{'scale':1}}, default_flow_style=False) )
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
