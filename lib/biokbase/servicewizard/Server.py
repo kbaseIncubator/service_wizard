@@ -43,7 +43,7 @@ def get_config():
 
 config = get_config()
 
-from ServiceWizard.ServiceWizardImpl import ServiceWizard
+from biokbase.servicewizard.Impl import ServiceWizard
 impl_ServiceWizard = ServiceWizard(config)
 
 

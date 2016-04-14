@@ -10,6 +10,7 @@ import zipfile
 from StringIO import StringIO
 import re
 from urlparse import urlparse
+from biokbase.catalog.Client import Catalog
 #END_HEADER
 
 
@@ -41,14 +42,18 @@ class ServiceWizard:
             self.deploy_config['svc-hostname'] = up.hostname
         if 'nginx-port' not in config:
             self.deploy_config['nginx-port'] = 443
-        
         #END_CONSTRUCTOR
         pass
 
     def start(self, ctx, service):
         # ctx is the context object
         #BEGIN start
-        shash = service['version'] #TODO: need to convert service version to hash
+        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
+        #TODO: not working yet
+        #mv = cc.module_version_lookup({'module_name' : service['module_name']})
+        #mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
+        #shash = mv['git_commit_hash']
+        shash = service['version']
         sname = "{0}-{1}".format(service['module_name'],shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
@@ -67,7 +72,7 @@ class ServiceWizard:
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
         eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
-        cmd_list = ['./bin/rancher-compose', '-p', service['module_name'], 'up', '-d']
+        cmd_list = ['rancher-compose', '-p', service['module_name'], 'up', '-d']
         try:
             tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
             stdout, stderr = tool_process.communicate()
@@ -81,7 +86,9 @@ class ServiceWizard:
     def stop(self, ctx, service):
         # ctx is the context object
         #BEGIN stop
-        shash = service['version'] #TODO: need to convert service version to hash
+        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
+        mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
+        shash = mv['git_commit_hash']
         sname = "{0}-{1}".format(service['module_name'],shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
@@ -100,7 +107,7 @@ class ServiceWizard:
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
         eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
-        cmd_list = ['./bin/rancher-compose', '-p', service['module_name'], 'stop']
+        cmd_list = ['rancher-compose', '-p', service['module_name'], 'stop']
         try:
             tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
             stdout, stderr = tool_process.communicate()
