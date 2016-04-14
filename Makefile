@@ -21,7 +21,7 @@ TOP_DIR_NAME = $(shell basename $(TOP_DIR))
 
 .PHONY: test
 
-default: compile install-deps build-startup-script build-executable-script build-test-script
+default: compile build-startup-script build-executable-script build-test-script
 
 compile:
 	mkdir -p $(LBIN_DIR)
