@@ -31,13 +31,13 @@ compile:
 		--out $(LIB_DIR) \
 		--plclname Bio::KBase::$(SERVICE_CAPS)::Client \
 		--jsclname javascript/Client \
-		--pyclname biokbase.$(SERVICE).Client \
+		--pyclname biokbase.$(SERVICE_CAPS).Client \
 		--javasrc src \
 		--java \
-		--pysrvname biokbase.$(SERVICE).Server \
-		--pyimplname biokbase.$(SERVICE).Impl;
+		--pysrvname biokbase.$(SERVICE_CAPS).Server \
+		--pyimplname biokbase.$(SERVICE_CAPS).Impl;
 	touch $(LIB_DIR)/biokbase/__init__.py
-	touch $(LIB_DIR)/biokbase/$(SERVICE)/__init__.py
+	touch $(LIB_DIR)/biokbase/$(SERVICE_CAPS)/__init__.py
 
 install-deps:
 	bash deps/rancher-compose.sh

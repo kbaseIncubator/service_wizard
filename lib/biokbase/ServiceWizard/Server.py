@@ -43,7 +43,7 @@ def get_config():
 
 config = get_config()
 
-from biokbase.servicewizard.Impl import ServiceWizard
+from biokbase.ServiceWizard.Impl import ServiceWizard
 impl_ServiceWizard = ServiceWizard(config)
 
 
@@ -61,6 +61,9 @@ class JSONObjectEncoder(json.JSONEncoder):
 sync_methods = {}
 async_run_methods = {}
 async_check_methods = {}
+async_run_methods['ServiceWizard.version_async'] = ['ServiceWizard', 'version']
+async_check_methods['ServiceWizard.version_check'] = ['ServiceWizard', 'version']
+sync_methods['ServiceWizard.version'] = True
 async_run_methods['ServiceWizard.start_async'] = ['ServiceWizard', 'start']
 async_check_methods['ServiceWizard.start_check'] = ['ServiceWizard', 'start']
 sync_methods['ServiceWizard.start'] = True
@@ -95,7 +98,7 @@ class AsyncJobServiceClient(object):
         self._headers = dict()
         self.trust_all_ssl_certificates = trust_all_ssl_certificates
         if token is None:
-            raise ValueError('Authentication is required for async methods')        
+            raise ValueError('Authentication is required for async methods')
         self._headers['AUTHORIZATION'] = token
         if self.timeout < 1:
             raise ValueError('Timeout value must be at least 1 second')
@@ -347,6 +350,10 @@ class Application(object):
         self.serverlog.set_log_level(6)
         self.rpc_service = JSONRPCServiceCustom()
         self.method_authentication = dict()
+        self.rpc_service.add(impl_ServiceWizard.version,
+                             name='ServiceWizard.version',
+                             types=[])
+        self.method_authentication['ServiceWizard.version'] = 'none'
         self.rpc_service.add(impl_ServiceWizard.start,
                              name='ServiceWizard.start',
                              types=[dict])
@@ -367,6 +374,9 @@ class Application(object):
                              name='ServiceWizard.get_service_status',
                              types=[dict])
         self.method_authentication['ServiceWizard.get_service_status'] = 'none'
+        self.rpc_service.add(impl_ServiceWizard.status,
+                             name='ServiceWizard.status',
+                             types=[dict])
         self.auth_client = biokbase.nexus.Client(
             config={'server': 'nexus.api.globusonline.org',
                     'verify_ssl': True,
@@ -402,7 +412,7 @@ class Application(object):
                 ctx['module'], ctx['method'] = req['method'].split('.')
                 ctx['call_id'] = req['id']
                 ctx['rpc_context'] = {'call_stack': [{'time':self.now_in_utc(), 'method': req['method']}]}
-                prov_action = {'service': ctx['module'], 'method': ctx['method'], 
+                prov_action = {'service': ctx['module'], 'method': ctx['method'],
                                'method_params': req['params']}
                 ctx['provenance'] = [prov_action]
                 try:
@@ -613,11 +623,11 @@ def stop_server():
 
 def process_async_cli(input_file_path, output_file_path, token):
     exit_code = 0
-    with open(input_file_path) as data_file:    
+    with open(input_file_path) as data_file:
         req = json.load(data_file)
     if 'version' not in req:
         req['version'] = '1.1'
-    if 'id' not in req: 
+    if 'id' not in req:
         req['id'] = str(_random.random())[2:]
     ctx = MethodContext(application.userlog)
     if token:
@@ -629,7 +639,7 @@ def process_async_cli(input_file_path, output_file_path, token):
         ctx['rpc_context'] = req['context']
     ctx['CLI'] = 1
     ctx['module'], ctx['method'] = req['method'].split('.')
-    prov_action = {'service': ctx['module'], 'method': ctx['method'], 
+    prov_action = {'service': ctx['module'], 'method': ctx['method'],
                    'method_params': req['params']}
     ctx['provenance'] = [prov_action]
     resp = None
@@ -658,14 +668,14 @@ def process_async_cli(input_file_path, output_file_path, token):
     with open(output_file_path, "w") as f:
         f.write(json.dumps(resp, cls=JSONObjectEncoder))
     return exit_code
-    
+
 if __name__ == "__main__":
     requests.packages.urllib3.disable_warnings()
     if len(sys.argv) >= 3 and len(sys.argv) <= 4 and os.path.isfile(sys.argv[1]):
         token = None
         if len(sys.argv) == 4:
             if os.path.isfile(sys.argv[3]):
-                with open(sys.argv[3]) as token_file: 
+                with open(sys.argv[3]) as token_file:
                     token = token_file.read()
             else:
                 token = sys.argv[3]
