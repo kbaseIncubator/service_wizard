@@ -59,14 +59,16 @@ class ServiceWizard:
         #mv = cc.module_version_lookup({'module_name' : service['module_name']})
         mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
         shash = mv['git_commit_hash']
+        # Use the name returned from the catalog service
+        catalog_module_name = mv['module_name']
         #shash = service['version']
-        sname = "{0}-{1}".format(service['module_name'],shash) # service name
+        sname = "{0}-{1}".format(catalog_module_name,shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
                    "links" : ["{0}:{0}".format(sname)]
                  },
                  sname : {
-                   "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url'],service['module_name'],shash)
+                   "image" : mv['docker_img_name']
                  }
                }
 
