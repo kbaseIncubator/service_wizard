@@ -89,7 +89,7 @@ class ServiceWizard:
         eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
         cmd_list = ['rancher-compose', '-p', service['module_name'], 'up', '-d']
         try:
-            tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
+            tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv, cwd=ymlpath)
             stdout, stderr = tool_process.communicate()
             pprint(stdout)
             pprint(stderr)
