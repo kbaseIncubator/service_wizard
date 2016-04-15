@@ -1,5 +1,6 @@
 #BEGIN_HEADER
 import os
+import time
 import yaml
 import subprocess
 from  pprint import pprint
@@ -68,10 +69,17 @@ class ServiceWizard:
                    "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url'],service['module_name'],shash)
                  }
                }
-        with open('docker-compose.yml', 'w') as outfile:
+
+        ymlpath = self.deploy_config['temp-dir'] + '/' + service['module_name'] + '/' + str(int(time.time()))
+        os.makedirs(ymlpath)
+
+        docker_compose_path=ymlpath + '/docker-compose.yml'
+        rancher_compose_path=ymlpath + '/rancher-compose.yml'
+
+        with open(docker_compose_path, 'w') as outfile:
             outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
         # can be extended later
-        with open('rancher-compose.yml', 'w') as outfile:
+        with open(rancher_compose_path, 'w') as outfile:
             outfile.write( yaml.safe_dump({sname:{'scale':1}}, default_flow_style=False) )
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
