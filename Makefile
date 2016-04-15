@@ -37,7 +37,7 @@ compile:
 		--pysrvname biokbase.$(SERVICE_CAPS).Server \
 		--pyimplname biokbase.$(SERVICE_CAPS).Impl;
 	touch $(LIB_DIR)/biokbase/__init__.py
-	touch $(LIB_DIR)/biokbase/$(SERVICE)/__init__.py
+	touch $(LIB_DIR)/biokbase/$(SERVICE_CAPS)/__init__.py
 
 install-deps:
 	bash deps/rancher-compose.sh
