@@ -88,6 +88,8 @@ deploy-client:
 	rsync -av lib/javascript/* $(TARGET)/lib/javascript/.
 
 deploy-python-service:
+	bash deps/rancher-compose.sh
+	rsync -av bin/rancher-compose $(TARGET)/bin
 	rsync -av lib/biokbase/$(SERVICE) $(TARGET)/lib/biokbase/. --exclude *.bak-*
 	echo $(GITCOMMIT) > $(TARGET)/lib/biokbase/$(SERVICE)/$(SERVICE).version
 	echo $(TAGS) >> $(TARGET)/lib/biokbase/$(SERVICE)/$(SERVICE).version
