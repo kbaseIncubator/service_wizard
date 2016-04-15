@@ -4,6 +4,9 @@ module ServiceWizard {
     
     typedef int boolean;
 
+    /* Get the version of the deployed service wizard endpoint. */
+    funcdef version() returns (string version);
+
     /*
         version - unified version field including semantic version, git commit hash and
             case of last version of tag (dev/beta/release).
