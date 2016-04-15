@@ -29,6 +29,10 @@ class ServiceWizard:
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
     #########################################
+    VERSION = "0.0.1"
+    GIT_URL = "https://github.com/msneddon/service_wizard"
+    GIT_COMMIT_HASH = "84d4cbff7a256f9c6f28bdb7f1dcad57312b58e3"
+    
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
 
@@ -44,6 +48,7 @@ class ServiceWizard:
             self.deploy_config['nginx-port'] = 443
         #END_CONSTRUCTOR
         pass
+    
 
     def start(self, ctx, service):
         # ctx is the context object
@@ -51,9 +56,9 @@ class ServiceWizard:
         cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
         #TODO: not working yet
         #mv = cc.module_version_lookup({'module_name' : service['module_name']})
-        #mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
-        #shash = mv['git_commit_hash']
-        shash = service['version']
+        mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
+        shash = mv['git_commit_hash']
+        #shash = service['version']
         sname = "{0}-{1}".format(service['module_name'],shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
@@ -131,27 +136,29 @@ class ServiceWizard:
         client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
                       access_key=self.deploy_config['access-key'],
                       secret_key=self.deploy_config['secret-key'])
-        slist = client.list('environment')
-
+        # get environment id
         result = []
-        for entry in slist:
-          if entry['type'] == 'environment':
-            es = {'module_name' : entry['name'], 'status' : entry['state'], 'health' : entry['healthState']}
-            # the following will be changed later but only for now
-            sr = client._session.get("{0}/environments/{1}/composeconfig".format(self.deploy_config['rancher-env-url'], entry['id']), auth=client._auth, params=None, headers=client._headers)
-            if sr.ok: 
-              dc=yaml.load(zipfile.ZipFile(StringIO(sr.content), "r").read('docker-compose.yml'))
-              if entry['name'] in dc and 'image' in dc[entry['name']] and re.match(r'^dockerhub-', dc[entry['name']]['image']):
-                for hk in dc.keys():
-                  if hk != entry['name']:
-                    es['hash'] = hk
-                    #if es['health'] == 'healthy' and es['status'] == 'active':
-                    if es['status'] == 'active':
-                      es['up'] = 1
-                    else:
-                      es['up'] = 0
-                    es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], entry['name'], es['hash'])
-                    result.append(es)
+        slists = client.list_environment()
+        if len(slists) == 0: return [] # I shouldn't return 
+        for slist in slists:
+          eid = slist['id']
+  
+          # get service info
+          entries = client.list_service(environmentId = eid)
+          if len(entries) == 0: continue
+         
+          for entry in entries:
+            rs = entry['name'].split('-')
+            if len(rs) != 2: continue
+            es = {'module_name' : rs[0], 'status' : entry['state'], 'health' : entry['healthState'], 'hash' : rs[1]}
+            #if es['health'] == 'healthy' and es['status'] == 'active':
+            if es['status'] == 'active':
+              es['up'] = 1
+            else:
+              es['up'] = 0
+            es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], rs[0], rs[1])
+            result.append(es)
+
         returnVal = result
         #END list_service_status
 
@@ -166,34 +173,32 @@ class ServiceWizard:
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN get_service_status
-        shash = service['version'] #TODO: need to convert service version to hash
+        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
+        mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
+        shash = mv['git_commit_hash']
         client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
                       access_key=self.deploy_config['access-key'],
                       secret_key=self.deploy_config['secret-key'])
-        slist = client.list('environment')
-
+        
         returnVal = None
-        for entry in slist:
-          if entry['type'] == 'environment':
-            if entry['name'] != service['name']:
-              continue
-            es = {'module_name' : entry['name'], 'status' : entry['state'], 'health' : entry['healthState']}
-            # the following will be changed later but only for now
-            sr = client._session.get("{0}/environments/{1}/composeconfig".format(self.deploy_config['rancher-env-url'], entry['id']), auth=client._auth, params=None, headers=client._headers)
-            if sr.ok: 
-              dc=yaml.load(zipfile.ZipFile(StringIO(sr.content), "r").read('docker-compose.yml'))
-              if entry['name'] in dc and 'image' in dc[entry['name']] and re.match(r'^dockerhub-', dc[entry['name']]['image']):
-                for hk in dc.keys():
-                  if hk != entry['name']:
-                    if hk != shash: continue
-                    es['hash'] = hk
-                    #if es['health'] == 'healthy' and es['status'] == 'active':
-                    if es['status'] == 'active':
-                      es['up'] = 1
-                    else:
-                      es['up'] = 0
-                    es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], entry['name'], es['hash'])
-                    returnVal = es
+
+        # get environment id
+        slist = client.list_environment(name=service['module_name'])
+        if len(slist) == 0: return None
+        eid = slist[0]['id']
+
+        # get service info
+        entry = client.list_service(environmentId = eid, name = '{0}-{1}'.format(service['module_name'],shash))
+        if len(entry) == 0: return None
+        entry = entry[0]
+        returnVal = {'module_name' : service['module_name'], 'status' : entry['state'], 'health' : entry['healthState']}
+        returnVal['hash'] = shash
+        #if es['health'] == 'healthy' and es['status'] == 'active':
+        if returnVal['status'] == 'active':
+          returnVal['up'] = 1
+        else:
+          returnVal['up'] = 0
+        returnVal['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], service['module_name'], shash)
         #END get_service_status
 
         # At some point might do deeper type checking...
@@ -201,4 +206,11 @@ class ServiceWizard:
             raise ValueError('Method get_service_status return value ' +
                              'returnVal is not type dict as required.')
         # return the results
+        return [returnVal]
+
+    def status(self, ctx):
+        #BEGIN_STATUS
+        returnVal = {'state': "OK", 'message': "", 'version': self.VERSION, 
+                     'git_url': self.GIT_URL, 'git_commit_hash': self.GIT_COMMIT_HASH}
+        #END_STATUS
         return [returnVal]
