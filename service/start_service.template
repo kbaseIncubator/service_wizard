@@ -42,7 +42,7 @@ uwsgi --master \
 echo "$KB_SERVICE_NAME started on port $port."
 echo "Errors are logged to: $KB_SERVICE_DIR/error.log"
 echo "Checking version to see if things successfully started up..."
-VERSION=$(curl -s -d '{{"params":[],"method":"Catalog.version","version":"1.1","id":"5313251235"}}' http://localhost:$port)
+VERSION=$(curl -s -d '{{"params":[],"method":"ServiceWizard.version","version":"1.1","id":"5313251235"}}' http://localhost:$port)
 if [ 0 -eq $? ]
 then
     echo $VERSION | python -c 'import sys, json; print(" -> up and running: "+json.load(sys.stdin)["result"][0])'

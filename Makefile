@@ -84,15 +84,15 @@ deploy-service: deploy-python-service
 deploy-client:
 	mkdir -p $(TARGET)/lib/Bio $(TARGET)/lib/biokbase $(TARGET)/lib/javascript
 	rsync -av lib/Bio/* $(TARGET)/lib/Bio/.
-	rsync -av lib/biokbase/$(SERVICE) $(TARGET)/lib/biokbase/. --exclude *.bak-*
+	rsync -av lib/biokbase/$(SERVICE_CAPS) $(TARGET)/lib/biokbase/. --exclude *.bak-*
 	rsync -av lib/javascript/* $(TARGET)/lib/javascript/.
 
 deploy-python-service:
 	bash deps/rancher-compose.sh
 	rsync -av bin/rancher-compose $(TARGET)/bin
-	rsync -av lib/biokbase/$(SERVICE) $(TARGET)/lib/biokbase/. --exclude *.bak-*
-	echo $(GITCOMMIT) > $(TARGET)/lib/biokbase/$(SERVICE)/$(SERVICE).version
-	echo $(TAGS) >> $(TARGET)/lib/biokbase/$(SERVICE)/$(SERVICE).version
+	rsync -av lib/biokbase/$(SERVICE_CAPS) $(TARGET)/lib/biokbase/. --exclude *.bak-*
+	echo $(GITCOMMIT) > $(TARGET)/lib/biokbase/$(SERVICE_CAPS)/$(SERVICE_CAPS).version
+	echo $(TAGS) >> $(TARGET)/lib/biokbase/$(SERVICE_CAPS)/$(SERVICE_CAPS).version
 
 # This will setup the deployment services directory for
 # this service, which includes start/stop scripts
@@ -102,7 +102,7 @@ deploy-server-control-scripts:
 	python service/build_server_scripts.py \
 		service/start_service.template \
 		service/stop_service.template \
-		$(SERVICE) \
+		$(SERVICE_CAPS) \
 		$(KB_RUNTIME) \
 		$(TARGET) \
 		$(TARGET)/services/$(SERVICE) \
