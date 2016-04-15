@@ -55,8 +55,6 @@ class ServiceWizard:
         # ctx is the context object
         #BEGIN start
         cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
-        #TODO: not working yet
-        #mv = cc.module_version_lookup({'module_name' : service['module_name']})
         mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
         shash = mv['git_commit_hash']
         # Use the name returned from the catalog service
@@ -146,6 +144,9 @@ class ServiceWizard:
         client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
                       access_key=self.deploy_config['access-key'],
                       secret_key=self.deploy_config['secret-key'])
+
+        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
+
         # get environment id
         result = []
         slists = client.list_environment()
@@ -166,7 +167,8 @@ class ServiceWizard:
               es['up'] = 1
             else:
               es['up'] = 0
-            es['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], rs[0], rs[1])
+            mv = cc.module_version_lookup({'module_name' : rs[0], 'lookup' : rs[1]})
+            es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], mv['git_commit_hash'])
             result.append(es)
 
         returnVal = result
@@ -208,7 +210,7 @@ class ServiceWizard:
           returnVal['up'] = 1
         else:
           returnVal['up'] = 0
-        returnVal['url'] = "https://{0}:{1}/dynserv/{2}-{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], service['module_name'], shash)
+        returnVal['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], shash)
         #END get_service_status
 
         # At some point might do deeper type checking...
