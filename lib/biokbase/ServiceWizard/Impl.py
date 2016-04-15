@@ -1,5 +1,6 @@
 #BEGIN_HEADER
 import os
+import time
 import yaml
 import subprocess
 from  pprint import pprint
@@ -58,20 +59,29 @@ class ServiceWizard:
         #mv = cc.module_version_lookup({'module_name' : service['module_name']})
         mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
         shash = mv['git_commit_hash']
-        #shash = service['version']
-        sname = "{0}-{1}".format(service['module_name'],shash) # service name
+        # Use the name returned from the catalog service
+        catalog_module_name = mv['module_name']
+        sname = "{0}-{1}".format(catalog_module_name,shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
                    "links" : ["{0}:{0}".format(sname)]
                  },
                  sname : {
-                   "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url'],service['module_name'],shash)
+                   "image" : mv['docker_img_name']
                  }
                }
-        with open('docker-compose.yml', 'w') as outfile:
+
+        # To do: try to use API to send docker-compose directly instead of needing to write to disk
+        ymlpath = self.deploy_config['temp-dir'] + '/' + catalog_module_name + '/' + str(int(time.time()))
+        os.makedirs(ymlpath)
+
+        docker_compose_path=ymlpath + '/docker-compose.yml'
+        rancher_compose_path=ymlpath + '/rancher-compose.yml'
+
+        with open(docker_compose_path, 'w') as outfile:
             outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
         # can be extended later
-        with open('rancher-compose.yml', 'w') as outfile:
+        with open(rancher_compose_path, 'w') as outfile:
             outfile.write( yaml.safe_dump({sname:{'scale':1}}, default_flow_style=False) )
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
