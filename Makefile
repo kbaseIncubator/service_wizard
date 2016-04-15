@@ -46,6 +46,7 @@ install-deps:
 	rsync  -av $(TARGET)/lib/biokbase/auth.py lib/biokbase/.
 	rsync  -av $(TARGET)/lib/biokbase/log.py lib/biokbase/.
 	rsync  -av $(TARGET)/lib/biokbase/nexus lib/biokbase/.
+	rsync  -av $(TARGET)/lib/biokbase/catalog lib/biokbase/.
 	rsync  -av bin/rancher-compose $(TARGET)/bin
 
 
