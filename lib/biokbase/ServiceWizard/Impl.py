@@ -61,7 +61,6 @@ class ServiceWizard:
         shash = mv['git_commit_hash']
         # Use the name returned from the catalog service
         catalog_module_name = mv['module_name']
-        #shash = service['version']
         sname = "{0}-{1}".format(catalog_module_name,shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
@@ -72,7 +71,8 @@ class ServiceWizard:
                  }
                }
 
-        ymlpath = self.deploy_config['temp-dir'] + '/' + service['module_name'] + '/' + str(int(time.time()))
+        # To do: try to use API to send docker-compose directly instead of needing to write to disk
+        ymlpath = self.deploy_config['temp-dir'] + '/' + catalog_module_name + '/' + str(int(time.time()))
         os.makedirs(ymlpath)
 
         docker_compose_path=ymlpath + '/docker-compose.yml'
