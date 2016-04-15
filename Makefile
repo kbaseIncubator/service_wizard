@@ -1,7 +1,7 @@
-SERVICE = servicewizard
+SERVICE = service_wizard
 SERVICE_CAPS = ServiceWizard
 SPEC_FILE = ServiceWizard.spec
-URL = https://kbase.us/services/servicewizard
+URL = https://kbase.us/services/service_wizard
 DIR = $(shell pwd)
 LIB_DIR = lib
 SCRIPTS_DIR = scripts
@@ -36,10 +36,7 @@ compile:
 		--pyimplname $(SERVICE_CAPS).$(SERVICE_CAPS)Impl;
 
 install-deps:
-	for i in `find deps -name '*.sh'`; \
-	do                                 \
-		bash $$i;                  \
-	done;
+	bash deps/rancher-compose.sh
 	mkdir -p lib/biokbase
 	rsync  -av $(TARGET)/lib/biokbase/__init__.py lib/biokbase/.
 	rsync  -av $(TARGET)/lib/biokbase/auth.py lib/biokbase/.
