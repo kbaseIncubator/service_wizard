@@ -16,11 +16,11 @@ module ServiceWizard {
         string version;
     } Service;
 
-
+    /* version is the semantic version of the module */
     typedef structure {
         string module_name;
 
-        string semantic_version;
+        string version;
         string hash;
 
         string url;
