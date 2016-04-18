@@ -173,7 +173,7 @@ class ServiceWizard:
               es['version'] = mv['version']
             except:
               # this may occur if the module version is not registered with the catalog, or is not a service
-              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], rs['module_name'], rs[1])
+              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], rs[0], rs[1])
               es['version'] = 'unknown'
             result.append(es)
 
