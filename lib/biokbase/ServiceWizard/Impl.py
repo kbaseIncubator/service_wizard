@@ -167,8 +167,14 @@ class ServiceWizard:
               es['up'] = 1
             else:
               es['up'] = 0
-            mv = cc.module_version_lookup({'module_name' : rs[0], 'lookup' : rs[1]})
-            es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], mv['git_commit_hash'])
+            try:
+              mv = cc.module_version_lookup({'module_name' : rs[0], 'lookup' : rs[1]})
+              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], mv['git_commit_hash'])
+              es['version'] = mv['version']
+            except:
+              # this may occur if the module version is not registered with the catalog, or is not a service
+              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], rs['module_name'], rs[1])
+              es['version'] = 'unknown'
             result.append(es)
 
         returnVal = result
@@ -185,6 +191,8 @@ class ServiceWizard:
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN get_service_status
+        # TODO: handle case where version is not registered in the catalog- this may be the case for core services
+        #       that were not registered in the usual way.
         cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
         mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
         shash = mv['git_commit_hash']
@@ -211,6 +219,7 @@ class ServiceWizard:
         else:
           returnVal['up'] = 0
         returnVal['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], shash)
+        returnVal['version'] = mv['version']
         #END get_service_status
 
         # At some point might do deeper type checking...
