@@ -85,7 +85,7 @@ class ServiceWizard:
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
         eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
-        cmd_list = ['rancher-compose', '-p', service['module_name'], 'up', '-d']
+        cmd_list = ['rancher-compose', '-p', catalog_module_name, 'up', '-d']
         try:
             tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv, cwd=ymlpath)
             stdout, stderr = tool_process.communicate()
@@ -102,13 +102,15 @@ class ServiceWizard:
         cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
         mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
         shash = mv['git_commit_hash']
-        sname = "{0}-{1}".format(service['module_name'],shash) # service name
+        # Use the name returned from the catalog service
+        catalog_module_name = mv['module_name']
+        sname = "{0}-{1}".format(catalog_module_name,shash) # service name
         docker_compose = { shash : {
                    "image" : "rancher/dns-service",
                    "links" : ["{0}:{0}".format(sname)]
                  },
                  sname : {
-                   "image" : "{0}/kbase:{1}.{2}".format(self.deploy_config['docker-registry-url'],service['module_name'],shash)
+                   "image" : mv['docker_img_name']
                  }
                }
         with open('docker-compose.yml', 'w') as outfile:
@@ -120,7 +122,7 @@ class ServiceWizard:
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
         eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
-        cmd_list = ['rancher-compose', '-p', service['module_name'], 'stop']
+        cmd_list = ['rancher-compose', '-p', catalog_module_name, 'stop']
         try:
             tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
             stdout, stderr = tool_process.communicate()
