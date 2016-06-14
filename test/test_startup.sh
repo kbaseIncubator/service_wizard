@@ -49,9 +49,16 @@ printf '\n'
 
 ######
 #now, actually start the 
-export KB_DEPLOYMENT_CONFIG=../deploy.cfg
-export PYTHONPATH=../lib:$PATH:$PYTHONPATH
-uwsgi --master --processes 1 --threads 2 --http :5000 --wsgi-file ../lib/ServiceWizard/ServiceWizardServer.py
+
+# sync up the libraries
+rsync -av ../lib/biokbase/* pylib/biokbase/. --exclude *.bak-*
+
+#start the service
+export KB_DEPLOYMENT_CONFIG=test-deploy.cfg
+export PYTHONPATH=pylib
+python test.py
+
+#uwsgi --master --processes 1 --threads 2 --http :5000 --wsgi-file pylib/biokbase/ServiceWizard/Server.py
 
 
 

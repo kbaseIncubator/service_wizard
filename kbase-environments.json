@@ -1,0 +1,14 @@
+{
+    "prod": {
+        "kbase-endpoint": "https://kbase.us/services"
+    },
+    "appdev": {
+        "kbase-endpoint": "https://appdev.kbase.us/services"
+    },
+    "next": {
+        "kbase-endpoint": "https://next.kbase.us/services"
+    },
+    "ci": {
+        "kbase-endpoint": "https://ci.kbase.us/services"
+    }
+}
