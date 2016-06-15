@@ -45,18 +45,33 @@ until $(curl -s $HOST:8080/v1/projects/1a5/hosts | python -c 'import json,sys; o
 done
 printf '\n'
 
+printf '\nCreate an admin account'
+curl -H "Content-Type: application/json" \
+     -X POST -d '{"enabled":true,"username":"admin","accessMode":"unrestricted","name":"admin","password":"admin"}' \
+     $HOST':8080/v1/localAuthConfigs' > /dev/null 2>&1
+
+printf '\Setup an api key for the admin account'
+# Unfortunately, I think this has to be done through the web-ui!!  arg! (unless you can get a web token somehow, use that to make the /v1/apiKey
+# POST to create the new api key
+
+# This call would work, if you can get the 
+#curl -H "Content-Type: application/json" \
+#     -u admin:admin \ # this line doesn't work...
+#     -X POST -d '{"accountId":"1a1","created":null,"description":null,"kind":null,"name":null,"removeTime":null,"removed":null,"type":"apikey"}' \
+#     $HOST':8080/v1/apiKey'
+
 
 
 ######
 #now, actually start the 
 
 # sync up the libraries
-rsync -av ../lib/biokbase/* pylib/biokbase/. --exclude *.bak-*
+#rsync -av ../lib/biokbase/* pylib/biokbase/. --exclude *.bak-*
 
 #start the service
-export KB_DEPLOYMENT_CONFIG=test-deploy.cfg
-export PYTHONPATH=pylib
-python test.py
+#export KB_DEPLOYMENT_CONFIG=test-deploy.cfg
+#export PYTHONPATH=pylib
+#python test.py
 
 #uwsgi --master --processes 1 --threads 2 --http :5000 --wsgi-file pylib/biokbase/ServiceWizard/Server.py
 

@@ -7,13 +7,13 @@ import datetime
 from multiprocessing import Process
 from getopt import getopt, GetoptError
 from jsonrpcbase import JSONRPCService, InvalidParamsError, KeywordError,\
-    JSONRPCError, ServerError, InvalidRequestError
+    JSONRPCError, InvalidRequestError
+from jsonrpcbase import ServerError as JSONServerError
 from os import environ
 from ConfigParser import ConfigParser
 from biokbase import log
 import biokbase.nexus
 import requests as _requests
-import urlparse as _urlparse
 import random as _random
 import os
 import requests.packages.urllib3
@@ -57,85 +57,6 @@ class JSONObjectEncoder(json.JSONEncoder):
         if hasattr(obj, 'toJSONable'):
             return obj.toJSONable()
         return json.JSONEncoder.default(self, obj)
-
-sync_methods = {}
-async_run_methods = {}
-async_check_methods = {}
-async_run_methods['ServiceWizard.version_async'] = ['ServiceWizard', 'version']
-async_check_methods['ServiceWizard.version_check'] = ['ServiceWizard', 'version']
-sync_methods['ServiceWizard.version'] = True
-async_run_methods['ServiceWizard.start_async'] = ['ServiceWizard', 'start']
-async_check_methods['ServiceWizard.start_check'] = ['ServiceWizard', 'start']
-sync_methods['ServiceWizard.start'] = True
-async_run_methods['ServiceWizard.stop_async'] = ['ServiceWizard', 'stop']
-async_check_methods['ServiceWizard.stop_check'] = ['ServiceWizard', 'stop']
-sync_methods['ServiceWizard.stop'] = True
-async_run_methods['ServiceWizard.pause_async'] = ['ServiceWizard', 'pause']
-async_check_methods['ServiceWizard.pause_check'] = ['ServiceWizard', 'pause']
-sync_methods['ServiceWizard.pause'] = True
-async_run_methods['ServiceWizard.list_service_status_async'] = ['ServiceWizard', 'list_service_status']
-async_check_methods['ServiceWizard.list_service_status_check'] = ['ServiceWizard', 'list_service_status']
-sync_methods['ServiceWizard.list_service_status'] = True
-async_run_methods['ServiceWizard.get_service_status_async'] = ['ServiceWizard', 'get_service_status']
-async_check_methods['ServiceWizard.get_service_status_check'] = ['ServiceWizard', 'get_service_status']
-sync_methods['ServiceWizard.get_service_status'] = True
-
-class AsyncJobServiceClient(object):
-
-    def __init__(self, timeout=30 * 60, token=None,
-                 ignore_authrc=True, trust_all_ssl_certificates=False):
-        url = environ.get('KB_JOB_SERVICE_URL', None)
-        if url is None and config is not None:
-            url = config.get('job-service-url')
-        if url is None:
-            raise ValueError('Neither \'job-service-url\' parameter is defined in '+
-                    'configuration nor \'KB_JOB_SERVICE_URL\' variable is defined in system')
-        scheme, _, _, _, _, _ = _urlparse.urlparse(url)
-        if scheme not in ['http', 'https']:
-            raise ValueError(url + " isn't a valid http url")
-        self.url = url
-        self.timeout = int(timeout)
-        self._headers = dict()
-        self.trust_all_ssl_certificates = trust_all_ssl_certificates
-        if token is None:
-            raise ValueError('Authentication is required for async methods')
-        self._headers['AUTHORIZATION'] = token
-        if self.timeout < 1:
-            raise ValueError('Timeout value must be at least 1 second')
-
-    def _call(self, method, params, json_rpc_call_context = None):
-        arg_hash = {'method': method,
-                    'params': params,
-                    'version': '1.1',
-                    'id': str(_random.random())[2:]
-                    }
-        if json_rpc_call_context:
-            arg_hash['context'] = json_rpc_call_context
-        body = json.dumps(arg_hash, cls=JSONObjectEncoder)
-        ret = _requests.post(self.url, data=body, headers=self._headers,
-                             timeout=self.timeout,
-                             verify=not self.trust_all_ssl_certificates)
-        if ret.status_code == _requests.codes.server_error:
-            if 'content-type' in ret.headers and ret.headers['content-type'] == 'application/json':
-                err = json.loads(ret.text)
-                if 'error' in err:
-                    raise ServerError(**err['error'])
-                else:
-                    raise ServerError('Unknown', 0, ret.text)
-            else:
-                raise ServerError('Unknown', 0, ret.text)
-        if ret.status_code != _requests.codes.OK:
-            ret.raise_for_status()
-        resp = json.loads(ret.text)
-        if 'result' not in resp:
-            raise ServerError('Unknown', 0, 'An unknown server error occurred')
-        return resp['result']
-
-    def run_job(self, run_job_params, json_rpc_call_context = None):
-        return self._call('KBaseJobService.run_job', [run_job_params], json_rpc_call_context)[0]
-
-    def check_job(self, job_id, json_rpc_call_context = None):
-        return self._call('KBaseJobService.check_job', [job_id], json_rpc_call_context)[0]
 
 
 class JSONRPCServiceCustom(JSONRPCService):
@@ -184,9 +105,9 @@ class JSONRPCServiceCustom(JSONRPCService):
         except Exception as e:
             # log.exception('method %s threw an exception' % request['method'])
             # Exception was raised inside the method.
-            newerr = ServerError()
+            newerr = JSONServerError()
             newerr.trace = traceback.format_exc()
-            newerr.data = e.__str__()
+            newerr.data = e.message
             raise newerr
         return result
 
@@ -310,6 +231,62 @@ class MethodContext(dict):
                                  self['user_id'], self['module'],
                                  self['method'], self['call_id'])
 
+    def provenance(self):
+        callbackURL = os.environ.get('SDK_CALLBACK_URL')
+        if callbackURL:
+            # OK, there's a callback server from which we can get provenance
+            arg_hash = {'method': 'CallbackServer.get_provenance',
+                        'params': [],
+                        'version': '1.1',
+                        'id': str(_random.random())[2:]
+                        }
+            body = json.dumps(arg_hash)
+            response = _requests.post(callbackURL, data=body,
+                                      timeout=60)
+            response.encoding = 'utf-8'
+            if response.status_code == 500:
+                if ('content-type' in response.headers and
+                        response.headers['content-type'] ==
+                        'application/json'):
+                    err = response.json()
+                    if 'error' in err:
+                        raise ServerError(**err['error'])
+                    else:
+                        raise ServerError('Unknown', 0, response.text)
+                else:
+                    raise ServerError('Unknown', 0, response.text)
+            if not response.ok:
+                response.raise_for_status()
+            resp = response.json()
+            if 'result' not in resp:
+                raise ServerError('Unknown', 0,
+                                  'An unknown server error occurred')
+            return resp['result'][0]
+        else:
+            return self.get('provenance')
+
+
+class ServerError(Exception):
+    '''
+    The call returned an error. Fields:
+    name - the name of the error.
+    code - the error code.
+    message - a human readable error message.
+    data - the server side stacktrace.
+    '''
+
+    def __init__(self, name, code, message, data=None, error=None):
+        super(Exception, self).__init__(message)
+        self.name = name
+        self.code = code
+        self.message = message if message else ''
+        self.data = data or error or ''
+        # data = JSON RPC 2.0, error = 1.1
+
+    def __str__(self):
+        return self.name + ': ' + str(self.code) + '. ' + self.message + \
+            '\n' + self.data
+
 
 def getIPAddress(environ):
     xFF = environ.get('HTTP_X_FORWARDED_FOR')
@@ -412,7 +389,7 @@ class Application(object):
                 ctx['module'], ctx['method'] = req['method'].split('.')
                 ctx['call_id'] = req['id']
                 ctx['rpc_context'] = {'call_stack': [{'time':self.now_in_utc(), 'method': req['method']}]}
-                prov_action = {'service': ctx['module'], 'method': ctx['method'],
+                prov_action = {'service': ctx['module'], 'method': ctx['method'], 
                                'method_params': req['params']}
                 ctx['provenance'] = [prov_action]
                 try:
@@ -420,15 +397,11 @@ class Application(object):
                     # parse out the method being requested and check if it
                     # has an authentication requirement
                     method_name = req['method']
-                    if method_name in async_run_methods:
-                        method_name = async_run_methods[method_name][0] + "." + async_run_methods[method_name][1]
-                    if method_name in async_check_methods:
-                        method_name = async_check_methods[method_name][0] + "." + async_check_methods[method_name][1]
                     auth_req = self.method_authentication.get(method_name,
                                                               "none")
                     if auth_req != "none":
                         if token is None and auth_req == 'required':
-                            err = ServerError()
+                            err = JSONServerError()
                             err.data = "Authentication required for " + \
                                 "ServiceWizard but no authentication header was passed"
                             raise err
@@ -443,57 +416,17 @@ class Application(object):
                                 ctx['token'] = token
                             except Exception, e:
                                 if auth_req == 'required':
-                                    err = ServerError()
+                                    err = JSONServerError()
                                     err.data = \
                                         "Token validation failed: %s" % e
                                     raise err
                     if (environ.get('HTTP_X_FORWARDED_FOR')):
                         self.log(log.INFO, ctx, 'X-Forwarded-For: ' +
                                  environ.get('HTTP_X_FORWARDED_FOR'))
-                    method_name = req['method']
-                    if method_name in async_run_methods or method_name in async_check_methods:
-                        if method_name in async_run_methods:
-                            orig_method_pair = async_run_methods[method_name]
-                        else:
-                            orig_method_pair = async_check_methods[method_name]
-                        orig_method_name = orig_method_pair[0] + '.' + orig_method_pair[1]
-                        if 'required' != self.method_authentication.get(orig_method_name, 'none'):
-                            err = ServerError()
-                            err.data = 'Async method ' + orig_method_name + ' should require ' + \
-                                'authentication, but it has authentication level: ' + \
-                                self.method_authentication.get(orig_method_name, 'none')
-                            raise err
-                        job_service_client = AsyncJobServiceClient(token = ctx['token'])
-                        if method_name in async_run_methods:
-                            run_job_params = {
-                                'method': orig_method_name,
-                                'params': req['params']}
-                            if 'rpc_context' in ctx:
-                                run_job_params['rpc_context'] = ctx['rpc_context']
-                            job_id = job_service_client.run_job(run_job_params)
-                            respond = {'version': '1.1', 'result': [job_id], 'id': req['id']}
-                            rpc_result = json.dumps(respond, cls=JSONObjectEncoder)
-                            status = '200 OK'
-                        else:
-                            job_id = req['params'][0]
-                            job_state = job_service_client.check_job(job_id)
-                            finished = job_state['finished']
-                            if finished != 0 and 'error' in job_state and job_state['error'] is not None:
-                                err = {'error': job_state['error']}
-                                rpc_result = self.process_error(err, ctx, req, None)
-                            else:
-                                respond = {'version': '1.1', 'result': [job_state], 'id': req['id']}
-                                rpc_result = json.dumps(respond, cls=JSONObjectEncoder)
-                                status = '200 OK'
-                    elif method_name in sync_methods or (method_name + '_async') not in async_run_methods:
-                        self.log(log.INFO, ctx, 'start method')
-                        rpc_result = self.rpc_service.call(ctx, req)
-                        self.log(log.INFO, ctx, 'end method')
-                        status = '200 OK'
-                    else:
-                        err = ServerError()
-                        err.data = 'Method ' + method_name + ' cannot be run synchronously'
-                        raise err
+                    self.log(log.INFO, ctx, 'start method')
+                    rpc_result = self.rpc_service.call(ctx, req)
+                    self.log(log.INFO, ctx, 'end method')
+                    status = '200 OK'
                 except JSONRPCError as jre:
                     err = {'error': {'code': jre.code,
                                      'name': jre.message,
@@ -623,11 +556,11 @@ def stop_server():
 
 def process_async_cli(input_file_path, output_file_path, token):
     exit_code = 0
-    with open(input_file_path) as data_file:
+    with open(input_file_path) as data_file:    
         req = json.load(data_file)
     if 'version' not in req:
         req['version'] = '1.1'
-    if 'id' not in req:
+    if 'id' not in req: 
         req['id'] = str(_random.random())[2:]
     ctx = MethodContext(application.userlog)
     if token:
@@ -639,7 +572,7 @@ def process_async_cli(input_file_path, output_file_path, token):
         ctx['rpc_context'] = req['context']
     ctx['CLI'] = 1
     ctx['module'], ctx['method'] = req['method'].split('.')
-    prov_action = {'service': ctx['module'], 'method': ctx['method'],
+    prov_action = {'service': ctx['module'], 'method': ctx['method'], 
                    'method_params': req['params']}
     ctx['provenance'] = [prov_action]
     resp = None
@@ -668,14 +601,14 @@ def process_async_cli(input_file_path, output_file_path, token):
     with open(output_file_path, "w") as f:
         f.write(json.dumps(resp, cls=JSONObjectEncoder))
     return exit_code
-
+    
 if __name__ == "__main__":
     requests.packages.urllib3.disable_warnings()
     if len(sys.argv) >= 3 and len(sys.argv) <= 4 and os.path.isfile(sys.argv[1]):
         token = None
         if len(sys.argv) == 4:
             if os.path.isfile(sys.argv[3]):
-                with open(sys.argv[3]) as token_file:
+                with open(sys.argv[3]) as token_file: 
                     token = token_file.read()
             else:
                 token = sys.argv[3]

@@ -1,5 +1,8 @@
 
 from pprint import pprint
+import os
+testdir = os.path.dirname(os.path.abspath(__file__))
+
 
 from biokbase.ServiceWizard.Impl import ServiceWizard
 
@@ -19,11 +22,12 @@ from biokbase.ServiceWizard.Impl import ServiceWizard
 
 
 config = {
+    'rancher-compose-bin':testdir+'/../bin/rancher-compose',
     'rancher-env-url':'http://192.168.99.100:8080',
     'catalog-url':'https://ci.kbase.us/services/catalog',
-    'temp-dir':'temp',
-    'access-key':'',
-    'secret-key':''
+    'temp-dir':testdir+'/temp',
+    'access-key':'D74D918EBDC9375CF6B8',
+    'secret-key':'jsnTpDmU2qsvyC8o55NtcjhcL4sft4Akf1nxC3Fj'
 }
 
 ctx = {'token':'asdf'}
@@ -34,3 +38,5 @@ print(wiz.version(ctx))
 
 
 wiz.start(ctx,{'module_name':'onerepotest','version':'dev'})
+status = wiz.get_service_status(ctx,{'module_name':'onerepotest','version':'dev'})
+pprint(status)
