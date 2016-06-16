@@ -76,25 +76,46 @@ class ServiceWizard:
 
     # Build the docker_compose and rancher_compose files
     def create_compose_files(self, module_version):
+        # in progress: pull the existing config from rancher and include in new config
+        # 1) look up service name to get project/environment
+        # 2) POST  {"serviceIds":[]} to /v1/projects/$projid/environments/$envid/?action=exportconfig
+        # parse dockerComposeConfig and rancherComposeConfig as yml
 
         # construct the service names
         service_name = self.get_service_name(module_version)
         dns_service_name = self.get_dns_service_name(module_version)
 
-        docker_compose = { 
-            dns_service_name : {
+        rancher = gdapi.Client(url=self.deploy_config['rancher-env-url'],
+                      access_key=self.deploy_config['access-key'],
+                      secret_key=self.deploy_config['secret-key'])
+
+        stacks = rancher.list_environment(name=service_name)
+
+        # there should be only one stack, but what if there is more than one?
+        if (len(stacks) > 0):
+            exportConfigURL=stacks[0]['actions']['exportconfig']
+
+            payload = {'serviceIds':[]}
+            configReq = requests.post(exportConfigURL, data = json.dumps(payload), auth=(self.deploy_config['access-key'],self.deploy_config['secret-key']),verify=False)
+            export=configReq.json()
+            docker_compose = yaml.load(export['dockerComposeConfig'])
+            rancher_compose = yaml.load(export['rancherComposeConfig'])
+        else:
+            docker_compose = {}
+            rancher_compose = {}
+
+        docker_compose[dns_service_name] = {
                 "image" : "rancher/dns-service",
                 "links" : [ service_name+':'+service_name ]
-            },
-            service_name : {
+            }
+        docker_compose[service_name] = {
                 "image" : module_version['docker_img_name']
             }
-        }
-        rancher_compose = {
-            service_name : {
+
+        rancher_compose[service_name] = {
                 "scale" : 1
             }
-        }
+
         return docker_compose, rancher_compose
 
     def get_service_url(self, module_version):
