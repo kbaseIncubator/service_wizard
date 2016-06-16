@@ -54,7 +54,7 @@ class ServiceWizard:
 
     # Given module information, generate a unique stack name for that version
     def get_stack_name(self, module_version):
-        name = module_version['module_name'] + '-'+module_version['version'] + '-' + module_version['git_commit_hash'][:7]
+        name = module_version['module_name'] #+ '-'+module_version['version'] + '-' + module_version['git_commit_hash'][:7]
         # stack names must have dashes, not underscores
         name = name.replace('_','-')
         # stack names must have dashes, not dots
