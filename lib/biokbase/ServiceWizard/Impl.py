@@ -49,48 +49,32 @@ class ServiceWizard:
     CATALOG_URL = ''
     SCRATCH_DIR = ''
 
+    SVC_HOSTNAME = ''
+    NGINX_PORT = ''
 
+    # Given module information, generate a unique stack name for that version
     def get_stack_name(self, module_version):
-        return module_version['module_name'] + '-'+module_version['version'] + '-' + module_version['git_commit_hash'][:7]
+        name = module_version['module_name'] + '-'+module_version['version'] + '-' + module_version['git_commit_hash'][:7]
+        # stack names must have dashes, not underscores
+        name = name.replace('_','-')
+        # stack names must have dashes, not dots
+        name = name.replace('.','-')
+        return name
 
-
-    def create_compose_files2(self, module_version):
-
-        # Use the name returned from the catalog service
-        hasher = hashlib.sha1(module_version['module_name'])
-        module_name_hash = base64.urlsafe_b64encode(hasher.digest())
-        service_name = module_name_hash + '-' + module_version['git_commit_hash']
-
-        shash = module_version['git_commit_hash']
-        catalog_module_name = module_version['module_name']
-
-        sname = "{0}-{1}".format(catalog_module_name,shash) # service name
-        docker_compose = { 
-            shash : {
-                "image" : "rancher/dns-service",
-                "links" : [ sname+':'+sname ]
-            },
-            sname : {
-                "image" : module_version['docker_img_name']
-            }
-        }
-        rancher_compose = {
-            sname : {
-                "scale" : 1
-            }
-        }
-        return docker_compose, rancher_compose
-
-    def create_compose_files(self, module_version):
-
+    def get_service_name(self, module_version):
         # hash the module name so we don't have to deal with illegal characters, length limits, etc
         module_name = module_version['module_name']
         git_commit_hash = module_version['git_commit_hash']
         module_name_hash = hashlib.md5(module_name).hexdigest()[:20]
 
+        return module_name_hash + '-' + git_commit_hash
+
+    # Build the docker_compose and rancher_compose files
+    def create_compose_files(self, module_version):
+
         # construct the service names
-        service_name = module_name_hash + '-' + git_commit_hash
-        dns_service_name = git_commit_hash
+        service_name = self.get_service_name(module_version)
+        dns_service_name = module_version['git_commit_hash']
 
         docker_compose = { 
             dns_service_name : {
@@ -108,12 +92,19 @@ class ServiceWizard:
         }
         return docker_compose, rancher_compose
 
+    def get_service_url(self, module_version):
+        url = "https://{0}:{1}/dynserv/{3}.{2}"
+        url = url.format(self.SVC_HOSTNAME, self.NGINX_PORT, module_version['module_name'], module_version['git_commit_hash'])
+        return url
+
+
     #END_CLASS_HEADER
 
     # config contains contents of config file in a hash or None if it couldn't
     # be found
     def __init__(self, config):
         #BEGIN_CONSTRUCTOR
+        self.VERSION = '0.2.0'
         self.deploy_config = config
         if 'svc-hostname' not in config:
             up = urlparse(config['rancher-env-url'])
@@ -132,6 +123,14 @@ class ServiceWizard:
             raise ValueError('"temp-dir" configuration variable not set"')
         self.SCRATCH_DIR = config['temp-dir']
 
+        if 'svc-hostname' not in config:
+            raise ValueError('"svc-hostname" configuration variable not set"')
+        self.SVC_HOSTNAME = config['svc-hostname']
+
+        if 'nginx-port' not in config:
+            raise ValueError('"nginx-port" configuration variable not set"')
+        self.NGINX_PORT = config['nginx-port']
+
         if not os.path.isfile(self.RANCHER_COMPOSE_BIN):
             print('WARNING: rancher-compose (='+self.RANCHER_COMPOSE_BIN+') command not found.  Set absolute location with "rancher-compose-bin" configuration.')
 
@@ -141,7 +140,6 @@ class ServiceWizard:
         else:
             self.RANCHER_ACCESS_KEY = config['access-key']
             self.RANCHER_SECRET_KEY = config['secret-key']
-            print('here');
 
         #END_CONSTRUCTOR
         pass
@@ -155,7 +153,7 @@ class ServiceWizard:
         # ctx is the context object
         # return variables are: version
         #BEGIN version
-        version='1.0.0'
+        version=self.VERSION
         #END version
 
         # At some point might do deeper type checking...
@@ -175,7 +173,7 @@ class ServiceWizard:
         # ctx is the context object
         #BEGIN start
 
-        print('STARTING: ' + str(service))
+        print('START REQUEST: ' + str(service))
 
         # First, lookup the module information from the catalog, make sure it is a service
         cc = Catalog(self.CATALOG_URL, token=ctx['token'])
@@ -210,6 +208,7 @@ class ServiceWizard:
 
         # create and run the rancher-compose up command
         stack_name = self.get_stack_name(mv)
+        print('STARTING STACK: ' + stack_name)
         cmd_list = [self.RANCHER_COMPOSE_BIN, '-p', stack_name, 'up', '-d']
         try:
             p = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, env=eenv, cwd=ymlpath)
@@ -238,13 +237,12 @@ class ServiceWizard:
         """
         # ctx is the context object
         #BEGIN stop
-        print('STOPPING: ' + str(service))
+        print('STOP REQUEST: ' + str(service))
 
         # lookup the module info from the catalog
         cc = Catalog(CATALOG_URL, token=ctx['token'])
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
         
-
         docker_compose, rancher_compose = self.create_compose_files(mv)
 
         with open('docker-compose.yml', 'w') as outfile:
@@ -256,14 +254,22 @@ class ServiceWizard:
         eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
         eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
         eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
-        cmd_list = ['rancher-compose', '-p', catalog_module_name, 'stop']
+
+        stack_name = self.get_stack_name(mv)
+        print('STOPPING STACK: ' + stack_name)
+        cmd_list = ['rancher-compose', '-p', stack_name, 'stop']
         try:
-            tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
-            stdout, stderr = tool_process.communicate()
-            pprint(stdout)
-            pprint(stderr)
+            p = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, env=eenv, cwd=ymlpath)
+            stdout, stderr = p.communicate()
         except:
             pprint(traceback.format_exc())
+            raise ValueError('Unable to stop service: Error calling rancher-compose: '+traceback.format_exc())
+
+        print('STDOUT:')
+        print(stdout)
+        print('STDERR:')
+        print(stderr)
+
         #END stop
         pass
 
@@ -359,32 +365,36 @@ class ServiceWizard:
         #BEGIN get_service_status
         # TODO: handle case where version is not registered in the catalog- this may be the case for core services
         #       that were not registered in the usual way.
-        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
-        shash = mv['git_commit_hash']
-        client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
+
+        stack_name = self.get_stack_name(mv)
+
+        rancher = gdapi.Client(url=self.deploy_config['rancher-env-url'],
                       access_key=self.deploy_config['access-key'],
                       secret_key=self.deploy_config['secret-key'])
         
         returnVal = None
 
         # get environment id
-        slist = client.list_environment(name=service['module_name'])
-        if len(slist) == 0: return None
+        slist = rancher.list_environment(name=stack_name)
+        if len(slist) == 0: 
+            return None
         eid = slist[0]['id']
 
         # get service info
-        entry = client.list_service(environmentId = eid, name = '{0}-{1}'.format(service['module_name'],shash))
+        entry = rancher.list_service(environmentId=eid, name=self.get_service_name(mv))
         if len(entry) == 0: return None
         entry = entry[0]
+
         returnVal = {'module_name' : service['module_name'], 'status' : entry['state'], 'health' : entry['healthState']}
-        returnVal['hash'] = shash
-        #if es['health'] == 'healthy' and es['status'] == 'active':
+
+        returnVal['hash'] = mv['git_commit_hash']
         if returnVal['status'] == 'active':
           returnVal['up'] = 1
         else:
           returnVal['up'] = 0
-        returnVal['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], shash)
+        returnVal['url'] = self.get_service_url(mv)
         returnVal['version'] = mv['version']
         #END get_service_status
 
