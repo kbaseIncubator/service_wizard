@@ -189,7 +189,6 @@ class ServiceWizard:
         # To do: try to use API to send docker-compose directly instead of needing to write to disk
         ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()))
         os.makedirs(ymlpath)
-
         docker_compose_path=ymlpath + '/docker-compose.yml'
         rancher_compose_path=ymlpath + '/rancher-compose.yml'
 
@@ -240,14 +239,19 @@ class ServiceWizard:
         print('STOP REQUEST: ' + str(service))
 
         # lookup the module info from the catalog
-        cc = Catalog(CATALOG_URL, token=ctx['token'])
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
         
         docker_compose, rancher_compose = self.create_compose_files(mv)
 
-        with open('docker-compose.yml', 'w') as outfile:
+        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()))
+        os.makedirs(ymlpath)
+        docker_compose_path=ymlpath + '/docker-compose.yml'
+        rancher_compose_path=ymlpath + '/rancher-compose.yml'
+
+        with open(docker_compose_path, 'w') as outfile:
             outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
-        with open('rancher-compose.yml', 'w') as outfile:
+        with open(rancher_compose_path, 'w') as outfile:
             outfile.write( yaml.safe_dump(rancher_compose, default_flow_style=False) )
 
         eenv = os.environ.copy()
@@ -257,7 +261,7 @@ class ServiceWizard:
 
         stack_name = self.get_stack_name(mv)
         print('STOPPING STACK: ' + stack_name)
-        cmd_list = ['rancher-compose', '-p', stack_name, 'stop']
+        cmd_list = [self.RANCHER_COMPOSE_BIN, '-p', stack_name, 'stop']
         try:
             p = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, env=eenv, cwd=ymlpath)
             stdout, stderr = p.communicate()
@@ -305,7 +309,7 @@ class ServiceWizard:
                       access_key=self.deploy_config['access-key'],
                       secret_key=self.deploy_config['secret-key'])
 
-        cc = Catalog(CATALOG_URL, token=ctx['token'])
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
 
         # get environment id
         result = []
