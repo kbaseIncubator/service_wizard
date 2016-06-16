@@ -61,12 +61,13 @@ class ServiceWizard:
         name = name.replace('.','-')
         return name
 
+    def get_module_name_hash(self, module_name):
+        return hashlib.md5(module_name).hexdigest()[:20]
+
     def get_service_name(self, module_version):
         # hash the module name so we don't have to deal with illegal characters, length limits, etc
-        module_name = module_version['module_name']
+        module_name_hash = self.get_module_name_hash(module_version['module_name'])
         git_commit_hash = module_version['git_commit_hash']
-        module_name_hash = hashlib.md5(module_name).hexdigest()[:20]
-
         return module_name_hash + '-' + git_commit_hash
 
     def get_dns_service_name(self, module_version):
@@ -313,40 +314,52 @@ class ServiceWizard:
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN list_service_status
-        client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
+        rancher = gdapi.Client(url=self.deploy_config['rancher-env-url'],
                       access_key=self.deploy_config['access-key'],
                       secret_key=self.deploy_config['secret-key'])
 
         cc = Catalog(self.CATALOG_URL, token=ctx['token'])
 
-        # get environment id
+        # first create simple module_name lookup based on hash (TODO: in catalog, allow us to only fetch dynamic service modules)
+        modules = cc.list_basic_module_info({'include_released':1, 'include_unreleased':1})
+        module_hash_lookup = {} # hash => module_name
+        for m in modules:
+            if 'dynamic_service' not in m or m['dynamic_service']!=1:
+                continue
+            module_hash_lookup[self.get_module_name_hash(m['module_name'])] = m['module_name']
+
+        # next get environment id (could be a config parameter in the future rather than looping over everything)
         result = []
-        slists = client.list_environment()
+        slists = rancher.list_environment()
         if len(slists) == 0: return [] # I shouldn't return 
         for slist in slists:
           eid = slist['id']
   
           # get service info
-          entries = client.list_service(environmentId = eid)
+          entries = rancher.list_service(environmentId = eid)
           if len(entries) == 0: continue
          
           for entry in entries:
             rs = entry['name'].split('-')
             if len(rs) != 2: continue
-            es = {'module_name' : rs[0], 'status' : entry['state'], 'health' : entry['healthState'], 'hash' : rs[1]}
+            es = {'status' : entry['state'], 'health' : entry['healthState'], 'hash' : rs[1]}
             #if es['health'] == 'healthy' and es['status'] == 'active':
             if es['status'] == 'active':
               es['up'] = 1
             else:
               es['up'] = 0
             try:
-              mv = cc.module_version_lookup({'module_name' : rs[0], 'lookup' : rs[1]})
-              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], mv['git_commit_hash'])
+              mv = cc.get_module_version({'module_name': module_hash_lookup[rs[0]],'version':rs[1]})
+              es['url'] = self.get_service_url(mv)
               es['version'] = mv['version']
+              es['module_name'] = mv['module_name'], 
             except:
-              # this may occur if the module version is not registered with the catalog, or is not a service
+              # this will occur if the module version is not registered with the catalog, or if the module
+              # was not marked as a service, or if something was started in Rancher directly and pulled
+              # from somewhere else, or an old version of the catalog was used to start this service
               es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], rs[0], rs[1])
-              es['version'] = 'unknown'
+              es['version'] = ''
+              es['module_name'] = '!'+rs[0]+''
             result.append(es)
 
         returnVal = result
