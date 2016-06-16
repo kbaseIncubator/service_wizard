@@ -69,12 +69,16 @@ class ServiceWizard:
 
         return module_name_hash + '-' + git_commit_hash
 
+    def get_dns_service_name(self, module_version):
+        dns_service_name = module_version['git_commit_hash']
+        return dns_service_name
+
     # Build the docker_compose and rancher_compose files
     def create_compose_files(self, module_version):
 
         # construct the service names
         service_name = self.get_service_name(module_version)
-        dns_service_name = module_version['git_commit_hash']
+        dns_service_name = self.get_dns_service_name(module_version)
 
         docker_compose = { 
             dns_service_name : {
@@ -94,7 +98,11 @@ class ServiceWizard:
 
     def get_service_url(self, module_version):
         url = "https://{0}:{1}/dynserv/{3}.{2}"
-        url = url.format(self.SVC_HOSTNAME, self.NGINX_PORT, module_version['module_name'], module_version['git_commit_hash'])
+        url = url.format(
+                    self.SVC_HOSTNAME, 
+                    self.NGINX_PORT, 
+                    self.get_stack_name(module_version),
+                    self.get_dns_service_name(module_version))
         return url
 
 
