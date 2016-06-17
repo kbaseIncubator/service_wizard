@@ -725,7 +725,7 @@ boolean is an int
 
 =head2 get_service_log
 
-  $log = $obj->get_service_log($service)
+  $log = $obj->get_service_log($params)
 
 =over 4
 
@@ -734,8 +734,10 @@ boolean is an int
 =begin html
 
 <pre>
-$service is a ServiceWizard.Service
+$params is a ServiceWizard.GetServiceLogParams
 $log is a ServiceWizard.ServiceLog
+GetServiceLogParams is a reference to a hash where the following keys are defined:
+	service has a value which is a ServiceWizard.Service
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
@@ -748,8 +750,10 @@ ServiceLog is a reference to a hash where the following keys are defined:
 
 =begin text
 
-$service is a ServiceWizard.Service
+$params is a ServiceWizard.GetServiceLogParams
 $log is a ServiceWizard.ServiceLog
+GetServiceLogParams is a reference to a hash where the following keys are defined:
+	service has a value which is a ServiceWizard.Service
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
@@ -779,10 +783,10 @@ ServiceLog is a reference to a hash where the following keys are defined:
 							       "Invalid argument count for function get_service_log (received $n, expecting 1)");
     }
     {
-	my($service) = @args;
+	my($params) = @args;
 
 	my @_bad_arguments;
-        (ref($service) eq 'HASH') or push(@_bad_arguments, "Invalid type for argument 1 \"service\" (value was \"$service\")");
+        (ref($params) eq 'HASH') or push(@_bad_arguments, "Invalid type for argument 1 \"params\" (value was \"$params\")");
         if (@_bad_arguments) {
 	    my $msg = "Invalid arguments passed to get_service_log:\n" . join("", map { "\t$_\n" } @_bad_arguments);
 	    Bio::KBase::Exceptions::ArgumentValidationError->throw(error => $msg,
@@ -1067,6 +1071,36 @@ log has a value which is a string
 
 a reference to a hash where the following keys are defined:
 log has a value which is a string
+
+
+=end text
+
+=back
+
+
+
+=head2 GetServiceLogParams
+
+=over 4
+
+
+
+=item Definition
+
+=begin html
+
+<pre>
+a reference to a hash where the following keys are defined:
+service has a value which is a ServiceWizard.Service
+
+</pre>
+
+=end html
+
+=begin text
+
+a reference to a hash where the following keys are defined:
+service has a value which is a ServiceWizard.Service
 
 
 =end text

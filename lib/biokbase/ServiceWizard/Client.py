@@ -210,9 +210,10 @@ class ServiceWizard(object):
             'ServiceWizard.get_service_status_without_restart',
             [service], self._service_ver, context)
 
-    def get_service_log(self, service, context=None):
+    def get_service_log(self, params, context=None):
         """
-        :param service: instance of type "Service" (module_name - the name of
+        :param params: instance of type "GetServiceLogParams" -> structure:
+           parameter "service" of type "Service" (module_name - the name of
            the service module, case-insensitive version     - specify the
            service version, which can be either: (1) full git commit hash of
            the module version (2) semantic version or semantic version
@@ -228,4 +229,4 @@ class ServiceWizard(object):
         """
         return self._client.call_method(
             'ServiceWizard.get_service_log',
-            [service], self._service_ver, context)
+            [params], self._service_ver, context)

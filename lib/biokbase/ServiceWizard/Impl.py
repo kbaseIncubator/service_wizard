@@ -38,7 +38,7 @@ class ServiceWizard:
     #########################################
     VERSION = "0.3.0"
     GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "06af9449348b068783095f45f319012fb99ce040"
+    GIT_COMMIT_HASH = "803c52113fd29c87cbfd59e379a3010478595c44"
     
     #BEGIN_CLASS_HEADER
 
@@ -97,6 +97,15 @@ class ServiceWizard:
         is_new_stack = False
         if (stacks is None or len(stacks) == 0):
             is_new_stack = True
+
+        # code to fetch existing docker_compose and rancher_compose files
+        #if len(stacks) > 0:
+        #    exportConfigURL=stacks[0]['actions']['exportconfig']
+        #    payload = {'serviceIds':[]}
+        #    configReq = requests.post(exportConfigURL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False)
+        #    export=configReq.json()
+        #    docker_compose = yaml.load(export['dockerComposeConfig'])
+        #    rancher_compose = yaml.load(export['rancherComposeConfig'])
 
         docker_compose = {}
         rancher_compose = {}
@@ -640,9 +649,10 @@ class ServiceWizard:
         # return the results
         return [status]
 
-    def get_service_log(self, ctx, service):
+    def get_service_log(self, ctx, params):
         """
-        :param service: instance of type "Service" (module_name - the name of
+        :param params: instance of type "GetServiceLogParams" -> structure:
+           parameter "service" of type "Service" (module_name - the name of
            the service module, case-insensitive version     - specify the
            service version, which can be either: (1) full git commit hash of
            the module version (2) semantic version or semantic version
@@ -659,6 +669,46 @@ class ServiceWizard:
         # ctx is the context object
         # return variables are: log
         #BEGIN get_service_log
+        service = params['service']
+        user_id = ctx['user_id']
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        module = cc.get_module_info({'module_name' : service['module_name']})
+        has_access = False
+        for o in module['owners']:
+            if o == user_id:
+                has_access = True
+        if not has_access:
+            if cc.is_admin(user_id)==1:
+                has_access = True
+
+        if not has_access:
+            raise ValueError('Only module owners and catalog admins can view service logs.')
+
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+
+        rancher = gdapi.Client(url=self.RANCHER_URL,
+                      access_key=self.RANCHER_ACCESS_KEY,
+                      secret_key=self.RANCHER_SECRET_KEY)
+
+        #service_info = rancher.list_servicess(name=self.get_service_name(mv))
+
+        GET_SERVICE_URL = self.RANCHER_URL + '/v1/services?name=' + self.get_service_name(mv)
+        service_info = requests.get(GET_SERVICE_URL, auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False).json()
+
+        pprint(service_info)
+        #exportConfigURL=stacks[0]['actions']['exportconfig']
+        #    payload = {'serviceIds':[]}
+        #    configReq = requests.post(exportConfigURL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False)
+        #    export=configReq.json()
+        #    docker_compose = yaml.load(export['dockerComposeConfig'])
+        #    rancher_compose = yaml.load(export['rancherComposeConfig'])
+
+        log = {}
+
         #END get_service_log
 
         # At some point might do deeper type checking...

@@ -101,6 +101,12 @@ module ServiceWizard {
         string log;
     } ServiceLog;
 
-    funcdef get_service_log(Service service) returns (ServiceLog log) authentication required;
+
+    typedef structure {
+        Service service;
+
+    } GetServiceLogParams;
+
+    funcdef get_service_log(GetServiceLogParams params) returns (ServiceLog log) authentication required;
 
 };

@@ -253,14 +253,14 @@ public class ServiceWizardClient {
      * <p>Original spec-file function name: get_service_log</p>
      * <pre>
      * </pre>
-     * @param   service   instance of type {@link us.kbase.servicewizard.Service Service}
+     * @param   params   instance of type {@link us.kbase.servicewizard.GetServiceLogParams GetServiceLogParams}
      * @return   parameter "log" of type {@link us.kbase.servicewizard.ServiceLog ServiceLog}
      * @throws IOException if an IO exception occurs
      * @throws JsonClientException if a JSON RPC exception occurs
      */
-    public ServiceLog getServiceLog(Service service, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+    public ServiceLog getServiceLog(GetServiceLogParams params, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
         List<Object> args = new ArrayList<Object>();
-        args.add(service);
+        args.add(params);
         TypeReference<List<ServiceLog>> retType = new TypeReference<List<ServiceLog>>() {};
         List<ServiceLog> res = caller.jsonrpcCall("ServiceWizard.get_service_log", args, retType, true, true, jsonRpcContext);
         return res.get(0);
