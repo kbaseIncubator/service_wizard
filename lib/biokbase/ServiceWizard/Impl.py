@@ -37,7 +37,7 @@ class ServiceWizard:
     #########################################
     VERSION = "0.3.0"
     GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "107f791d6c0075025ebfdec9d200606cafd14e7e"
+    GIT_COMMIT_HASH = "7d347d99a2f708b14590c5dd1cb40ee29df702b2"
     
     #BEGIN_CLASS_HEADER
 
@@ -230,12 +230,38 @@ class ServiceWizard:
 
     def start(self, ctx, service):
         """
-        :param service: instance of type "Service" (version - unified version
-           field including semantic version, git commit hash and case of last
-           version of tag (dev/beta/release).) -> structure: parameter
-           "module_name" of String, parameter "version" of String
+        Try to start the specified service; this will generate an error if the
+        specified service cannot be started.  If the startup did not give any
+        errors, then the status of the running service is provided.
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceStatus" (module_name     - name of
+           the service module version         - semantic version number of
+           the service module git_commit_hash - git commit hash of the
+           service module release_tags    - list of release tags currently
+           for this service module (dev/beta/release) url             - the
+           url of the service up              - 1 if the service is up, 0
+           otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
         """
         # ctx is the context object
+        # return variables are: status
         #BEGIN start
 
         print('START REQUEST: ' + str(service))
@@ -289,17 +315,51 @@ class ServiceWizard:
         if p.returncode != 0:
             raise ValueError('Unable to start service: Error was: \n' + stdout);
 
+        status = self.get_single_service_status(mv)
+
         #END start
-        pass
+
+        # At some point might do deeper type checking...
+        if not isinstance(status, dict):
+            raise ValueError('Method start return value ' +
+                             'status is not type dict as required.')
+        # return the results
+        return [status]
 
     def stop(self, ctx, service):
         """
-        :param service: instance of type "Service" (version - unified version
-           field including semantic version, git commit hash and case of last
-           version of tag (dev/beta/release).) -> structure: parameter
-           "module_name" of String, parameter "version" of String
+        Try to stop the specified service; this will generate an error if the
+        specified service cannot be stopped.  If the stop did not give any
+        errors, then the status of the stopped service is provided.
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceStatus" (module_name     - name of
+           the service module version         - semantic version number of
+           the service module git_commit_hash - git commit hash of the
+           service module release_tags    - list of release tags currently
+           for this service module (dev/beta/release) url             - the
+           url of the service up              - 1 if the service is up, 0
+           otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
         """
         # ctx is the context object
+        # return variables are: status
         #BEGIN stop
         print('STOP REQUEST: ' + str(service))
 
@@ -343,34 +403,37 @@ class ServiceWizard:
         print('STDERR:')
         print(stderr)
 
+        status = self.get_single_service_status(mv)
         #END stop
-        pass
 
-    def pause(self, ctx, service):
-        """
-        :param service: instance of type "Service" (version - unified version
-           field including semantic version, git commit hash and case of last
-           version of tag (dev/beta/release).) -> structure: parameter
-           "module_name" of String, parameter "version" of String
-        """
-        # ctx is the context object
-        #BEGIN pause
-        #END pause
-        pass
+        # At some point might do deeper type checking...
+        if not isinstance(status, dict):
+            raise ValueError('Method stop return value ' +
+                             'status is not type dict as required.')
+        # return the results
+        return [status]
 
     def list_service_status(self, ctx, params):
         """
-        :param params: instance of type "ListServiceStatusParams" ->
-           structure: parameter "is_up" of type "boolean", parameter
-           "module_names" of list of String
-        :returns: instance of list of type "ServiceStatus" (version is the
-           semantic version of the module) -> structure: parameter
-           "module_name" of String, parameter "version" of String, parameter
-           "git_commit_hash" of String, parameter "release_tags" of list of
-           String, parameter "hash" of String, parameter "url" of String,
-           parameter "node" of String, parameter "up" of type "boolean",
-           parameter "status" of String, parameter "health" of String,
-           parameter "last_request_timestamp" of String
+        :param params: instance of type "ListServiceStatusParams" (not yet
+           implemented funcdef pause(Service service) returns (ServiceStatus
+           status);) -> structure: parameter "is_up" of type "boolean",
+           parameter "module_names" of list of String
+        :returns: instance of list of type "ServiceStatus" (module_name     -
+           name of the service module version         - semantic version
+           number of the service module git_commit_hash - git commit hash of
+           the service module release_tags    - list of release tags
+           currently for this service module (dev/beta/release) url          
+           - the url of the service up              - 1 if the service is up,
+           0 otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
         """
         # ctx is the context object
         # return variables are: returnVal
@@ -439,22 +502,40 @@ class ServiceWizard:
 
     def get_service_status(self, ctx, service):
         """
-        For a given service, check on the status.  If the service is down, attempt to restart.
-        :param service: instance of type "Service" (version - unified version
-           field including semantic version, git commit hash and case of last
-           version of tag (dev/beta/release).) -> structure: parameter
-           "module_name" of String, parameter "version" of String
-        :returns: instance of type "ServiceStatus" (version is the semantic
-           version of the module) -> structure: parameter "module_name" of
+        For a given service, check on the status.  If the service is down or
+        not running, this function will attempt to start or restart the
+        service once, then return the status.
+        This function will throw an error if the specified service cannot be
+        found or encountered errors on startup.
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceStatus" (module_name     - name of
+           the service module version         - semantic version number of
+           the service module git_commit_hash - git commit hash of the
+           service module release_tags    - list of release tags currently
+           for this service module (dev/beta/release) url             - the
+           url of the service up              - 1 if the service is up, 0
+           otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
            String, parameter "version" of String, parameter "git_commit_hash"
            of String, parameter "release_tags" of list of String, parameter
-           "hash" of String, parameter "url" of String, parameter "node" of
-           String, parameter "up" of type "boolean", parameter "status" of
-           String, parameter "health" of String, parameter
-           "last_request_timestamp" of String
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
         """
         # ctx is the context object
-        # return variables are: returnVal
+        # return variables are: status
         #BEGIN get_service_status
 
         # TODO: handle case where version is not registered in the catalog- this may be the case for core services
@@ -476,17 +557,17 @@ class ServiceWizard:
             # try to get status
             status = self.get_single_service_status(mv)
 
-        # return the status
-        returnVal = status
+        if status is None:
+            raise ValueError('Unable to get service status, or service was unable to start properly');
 
         #END get_service_status
 
         # At some point might do deeper type checking...
-        if not isinstance(returnVal, dict):
+        if not isinstance(status, dict):
             raise ValueError('Method get_service_status return value ' +
-                             'returnVal is not type dict as required.')
+                             'status is not type dict as required.')
         # return the results
-        return [returnVal]
+        return [status]
 
     def status(self, ctx):
         #BEGIN_STATUS

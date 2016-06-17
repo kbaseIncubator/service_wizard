@@ -14,8 +14,16 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * <p>Original spec-file type: Service</p>
  * <pre>
- * version - unified version field including semantic version, git commit hash and
- *     case of last version of tag (dev/beta/release).
+ * module_name - the name of the service module, case-insensitive
+ * version     - specify the service version, which can be either:
+ *                 (1) full git commit hash of the module version
+ *                 (2) semantic version or semantic version specification
+ *                     Note: semantic version lookup will only work for 
+ *                     released versions of the module.
+ *                 (3) release tag, which is one of: dev | beta | release
+ * This information is always fetched from the Catalog, so for more details
+ * on specifying the version, see the Catalog documentation for the
+ * get_module_version method.
  * </pre>
  * 
  */

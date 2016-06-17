@@ -12,7 +12,6 @@ eval {
     $get_time = sub { Time::HiRes::gettimeofday() };
 };
 
-use Bio::KBase::AuthToken;
 
 # Client version should match Impl version
 # This is a Semantic Version number,
@@ -75,20 +74,6 @@ sub new
 	push(@{$self->{headers}}, 'Kbrpc-Errordest', $self->{kbrpc_error_dest});
     }
 
-    #
-    # This module requires authentication.
-    #
-    # We create an auth token, passing through the arguments that we were (hopefully) given.
-
-    {
-	my $token = Bio::KBase::AuthToken->new(@args);
-	
-	if (!$token->error_message)
-	{
-	    $self->{token} = $token->token;
-	    $self->{client}->{token} = $token->token;
-	}
-    }
 
     my $ua = $self->{client}->ua;	 
     my $timeout = $ENV{CDMI_TIMEOUT} || (30 * 60);	 
@@ -171,7 +156,7 @@ Get the version of the deployed service wizard endpoint.
 
 =head2 start
 
-  $obj->start($service)
+  $status = $obj->start($service)
 
 =over 4
 
@@ -181,9 +166,21 @@ Get the version of the deployed service wizard endpoint.
 
 <pre>
 $service is a ServiceWizard.Service
+$status is a ServiceWizard.ServiceStatus
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
+ServiceStatus is a reference to a hash where the following keys are defined:
+	module_name has a value which is a string
+	version has a value which is a string
+	git_commit_hash has a value which is a string
+	release_tags has a value which is a reference to a list where each element is a string
+	hash has a value which is a string
+	url has a value which is a string
+	up has a value which is a ServiceWizard.boolean
+	status has a value which is a string
+	health has a value which is a string
+boolean is an int
 
 </pre>
 
@@ -192,16 +189,30 @@ Service is a reference to a hash where the following keys are defined:
 =begin text
 
 $service is a ServiceWizard.Service
+$status is a ServiceWizard.ServiceStatus
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
+ServiceStatus is a reference to a hash where the following keys are defined:
+	module_name has a value which is a string
+	version has a value which is a string
+	git_commit_hash has a value which is a string
+	release_tags has a value which is a reference to a list where each element is a string
+	hash has a value which is a string
+	url has a value which is a string
+	up has a value which is a ServiceWizard.boolean
+	status has a value which is a string
+	health has a value which is a string
+boolean is an int
 
 
 =end text
 
 =item Description
 
-
+Try to start the specified service; this will generate an error if the
+specified service cannot be started.  If the startup did not give any
+errors, then the status of the running service is provided.
 
 =back
 
@@ -211,7 +222,7 @@ Service is a reference to a hash where the following keys are defined:
 {
     my($self, @args) = @_;
 
-# Authentication: required
+# Authentication: none
 
     if ((my $n = @args) != 1)
     {
@@ -242,7 +253,7 @@ Service is a reference to a hash where the following keys are defined:
 					       data => $result->content->{error}->{error} # JSON::RPC::ReturnObject only supports JSONRPC 1.1 or 1.O
 					      );
 	} else {
-	    return;
+	    return wantarray ? @{$result->result} : $result->result->[0];
 	}
     } else {
         Bio::KBase::Exceptions::HTTP->throw(error => "Error invoking method start",
@@ -256,7 +267,7 @@ Service is a reference to a hash where the following keys are defined:
 
 =head2 stop
 
-  $obj->stop($service)
+  $status = $obj->stop($service)
 
 =over 4
 
@@ -266,9 +277,21 @@ Service is a reference to a hash where the following keys are defined:
 
 <pre>
 $service is a ServiceWizard.Service
+$status is a ServiceWizard.ServiceStatus
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
+ServiceStatus is a reference to a hash where the following keys are defined:
+	module_name has a value which is a string
+	version has a value which is a string
+	git_commit_hash has a value which is a string
+	release_tags has a value which is a reference to a list where each element is a string
+	hash has a value which is a string
+	url has a value which is a string
+	up has a value which is a ServiceWizard.boolean
+	status has a value which is a string
+	health has a value which is a string
+boolean is an int
 
 </pre>
 
@@ -277,16 +300,30 @@ Service is a reference to a hash where the following keys are defined:
 =begin text
 
 $service is a ServiceWizard.Service
+$status is a ServiceWizard.ServiceStatus
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
+ServiceStatus is a reference to a hash where the following keys are defined:
+	module_name has a value which is a string
+	version has a value which is a string
+	git_commit_hash has a value which is a string
+	release_tags has a value which is a reference to a list where each element is a string
+	hash has a value which is a string
+	url has a value which is a string
+	up has a value which is a ServiceWizard.boolean
+	status has a value which is a string
+	health has a value which is a string
+boolean is an int
 
 
 =end text
 
 =item Description
 
-
+Try to stop the specified service; this will generate an error if the
+specified service cannot be stopped.  If the stop did not give any
+errors, then the status of the stopped service is provided.
 
 =back
 
@@ -296,7 +333,7 @@ Service is a reference to a hash where the following keys are defined:
 {
     my($self, @args) = @_;
 
-# Authentication: required
+# Authentication: none
 
     if ((my $n = @args) != 1)
     {
@@ -327,97 +364,12 @@ Service is a reference to a hash where the following keys are defined:
 					       data => $result->content->{error}->{error} # JSON::RPC::ReturnObject only supports JSONRPC 1.1 or 1.O
 					      );
 	} else {
-	    return;
+	    return wantarray ? @{$result->result} : $result->result->[0];
 	}
     } else {
         Bio::KBase::Exceptions::HTTP->throw(error => "Error invoking method stop",
 					    status_line => $self->{client}->status_line,
 					    method_name => 'stop',
-				       );
-    }
-}
- 
-
-
-=head2 pause
-
-  $obj->pause($service)
-
-=over 4
-
-=item Parameter and return types
-
-=begin html
-
-<pre>
-$service is a ServiceWizard.Service
-Service is a reference to a hash where the following keys are defined:
-	module_name has a value which is a string
-	version has a value which is a string
-
-</pre>
-
-=end html
-
-=begin text
-
-$service is a ServiceWizard.Service
-Service is a reference to a hash where the following keys are defined:
-	module_name has a value which is a string
-	version has a value which is a string
-
-
-=end text
-
-=item Description
-
-
-
-=back
-
-=cut
-
- sub pause
-{
-    my($self, @args) = @_;
-
-# Authentication: required
-
-    if ((my $n = @args) != 1)
-    {
-	Bio::KBase::Exceptions::ArgumentValidationError->throw(error =>
-							       "Invalid argument count for function pause (received $n, expecting 1)");
-    }
-    {
-	my($service) = @args;
-
-	my @_bad_arguments;
-        (ref($service) eq 'HASH') or push(@_bad_arguments, "Invalid type for argument 1 \"service\" (value was \"$service\")");
-        if (@_bad_arguments) {
-	    my $msg = "Invalid arguments passed to pause:\n" . join("", map { "\t$_\n" } @_bad_arguments);
-	    Bio::KBase::Exceptions::ArgumentValidationError->throw(error => $msg,
-								   method_name => 'pause');
-	}
-    }
-
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.pause",
-	params => \@args,
-    });
-    if ($result) {
-	if ($result->is_error) {
-	    Bio::KBase::Exceptions::JSONRPC->throw(error => $result->error_message,
-					       code => $result->content->{error}->{code},
-					       method_name => 'pause',
-					       data => $result->content->{error}->{error} # JSON::RPC::ReturnObject only supports JSONRPC 1.1 or 1.O
-					      );
-	} else {
-	    return;
-	}
-    } else {
-        Bio::KBase::Exceptions::HTTP->throw(error => "Error invoking method pause",
-					    status_line => $self->{client}->status_line,
-					    method_name => 'pause',
 				       );
     }
 }
@@ -448,11 +400,9 @@ ServiceStatus is a reference to a hash where the following keys are defined:
 	release_tags has a value which is a reference to a list where each element is a string
 	hash has a value which is a string
 	url has a value which is a string
-	node has a value which is a string
 	up has a value which is a ServiceWizard.boolean
 	status has a value which is a string
 	health has a value which is a string
-	last_request_timestamp has a value which is a string
 
 </pre>
 
@@ -473,11 +423,9 @@ ServiceStatus is a reference to a hash where the following keys are defined:
 	release_tags has a value which is a reference to a list where each element is a string
 	hash has a value which is a string
 	url has a value which is a string
-	node has a value which is a string
 	up has a value which is a ServiceWizard.boolean
 	status has a value which is a string
 	health has a value which is a string
-	last_request_timestamp has a value which is a string
 
 
 =end text
@@ -539,7 +487,7 @@ ServiceStatus is a reference to a hash where the following keys are defined:
 
 =head2 get_service_status
 
-  $return = $obj->get_service_status($service)
+  $status = $obj->get_service_status($service)
 
 =over 4
 
@@ -549,7 +497,7 @@ ServiceStatus is a reference to a hash where the following keys are defined:
 
 <pre>
 $service is a ServiceWizard.Service
-$return is a ServiceWizard.ServiceStatus
+$status is a ServiceWizard.ServiceStatus
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
@@ -560,11 +508,9 @@ ServiceStatus is a reference to a hash where the following keys are defined:
 	release_tags has a value which is a reference to a list where each element is a string
 	hash has a value which is a string
 	url has a value which is a string
-	node has a value which is a string
 	up has a value which is a ServiceWizard.boolean
 	status has a value which is a string
 	health has a value which is a string
-	last_request_timestamp has a value which is a string
 boolean is an int
 
 </pre>
@@ -574,7 +520,7 @@ boolean is an int
 =begin text
 
 $service is a ServiceWizard.Service
-$return is a ServiceWizard.ServiceStatus
+$status is a ServiceWizard.ServiceStatus
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
@@ -585,11 +531,9 @@ ServiceStatus is a reference to a hash where the following keys are defined:
 	release_tags has a value which is a reference to a list where each element is a string
 	hash has a value which is a string
 	url has a value which is a string
-	node has a value which is a string
 	up has a value which is a ServiceWizard.boolean
 	status has a value which is a string
 	health has a value which is a string
-	last_request_timestamp has a value which is a string
 boolean is an int
 
 
@@ -597,7 +541,12 @@ boolean is an int
 
 =item Description
 
-For a given service, check on the status.  If the service is down, attempt to restart.
+For a given service, check on the status.  If the service is down or
+not running, this function will attempt to start or restart the
+service once, then return the status.
+
+This function will throw an error if the specified service cannot be
+found or encountered errors on startup.
 
 =back
 
@@ -741,8 +690,17 @@ an int
 
 =item Description
 
-version - unified version field including semantic version, git commit hash and
-    case of last version of tag (dev/beta/release).
+module_name - the name of the service module, case-insensitive
+version     - specify the service version, which can be either:
+                (1) full git commit hash of the module version
+                (2) semantic version or semantic version specification
+                    Note: semantic version lookup will only work for 
+                    released versions of the module.
+                (3) release tag, which is one of: dev | beta | release
+
+This information is always fetched from the Catalog, so for more details
+on specifying the version, see the Catalog documentation for the
+get_module_version method.
 
 
 =item Definition
@@ -779,7 +737,19 @@ version has a value which is a string
 
 =item Description
 
-version is the semantic version of the module
+module_name     - name of the service module
+version         - semantic version number of the service module
+git_commit_hash - git commit hash of the service module
+release_tags    - list of release tags currently for this service module (dev/beta/release)
+
+url             - the url of the service
+
+up              - 1 if the service is up, 0 otherwise
+status          - status of the service as reported by rancher
+health          - health of the service as reported by Rancher
+
+TODO: 
+  add something to return: string last_request_timestamp;
 
 
 =item Definition
@@ -794,11 +764,9 @@ git_commit_hash has a value which is a string
 release_tags has a value which is a reference to a list where each element is a string
 hash has a value which is a string
 url has a value which is a string
-node has a value which is a string
 up has a value which is a ServiceWizard.boolean
 status has a value which is a string
 health has a value which is a string
-last_request_timestamp has a value which is a string
 
 </pre>
 
@@ -813,11 +781,9 @@ git_commit_hash has a value which is a string
 release_tags has a value which is a reference to a list where each element is a string
 hash has a value which is a string
 url has a value which is a string
-node has a value which is a string
 up has a value which is a ServiceWizard.boolean
 status has a value which is a string
 health has a value which is a string
-last_request_timestamp has a value which is a string
 
 
 =end text
@@ -830,6 +796,12 @@ last_request_timestamp has a value which is a string
 
 =over 4
 
+
+
+=item Description
+
+not yet implemented
+funcdef pause(Service service) returns (ServiceStatus status);
 
 
 =item Definition

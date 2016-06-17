@@ -15,7 +15,16 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * <p>Original spec-file type: ServiceStatus</p>
  * <pre>
- * version is the semantic version of the module
+ * module_name     - name of the service module
+ * version         - semantic version number of the service module
+ * git_commit_hash - git commit hash of the service module
+ * release_tags    - list of release tags currently for this service module (dev/beta/release)
+ * url             - the url of the service
+ * up              - 1 if the service is up, 0 otherwise
+ * status          - status of the service as reported by rancher
+ * health          - health of the service as reported by Rancher
+ * TODO: 
+ *   add something to return: string last_request_timestamp;
  * </pre>
  * 
  */
@@ -28,11 +37,9 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "release_tags",
     "hash",
     "url",
-    "node",
     "up",
     "status",
-    "health",
-    "last_request_timestamp"
+    "health"
 })
 public class ServiceStatus {
 
@@ -48,16 +55,12 @@ public class ServiceStatus {
     private java.lang.String hash;
     @JsonProperty("url")
     private java.lang.String url;
-    @JsonProperty("node")
-    private java.lang.String node;
     @JsonProperty("up")
     private Long up;
     @JsonProperty("status")
     private java.lang.String status;
     @JsonProperty("health")
     private java.lang.String health;
-    @JsonProperty("last_request_timestamp")
-    private java.lang.String lastRequestTimestamp;
     private Map<java.lang.String, Object> additionalProperties = new HashMap<java.lang.String, Object>();
 
     @JsonProperty("module_name")
@@ -150,21 +153,6 @@ public class ServiceStatus {
         return this;
     }
 
-    @JsonProperty("node")
-    public java.lang.String getNode() {
-        return node;
-    }
-
-    @JsonProperty("node")
-    public void setNode(java.lang.String node) {
-        this.node = node;
-    }
-
-    public ServiceStatus withNode(java.lang.String node) {
-        this.node = node;
-        return this;
-    }
-
     @JsonProperty("up")
     public Long getUp() {
         return up;
@@ -210,21 +198,6 @@ public class ServiceStatus {
         return this;
     }
 
-    @JsonProperty("last_request_timestamp")
-    public java.lang.String getLastRequestTimestamp() {
-        return lastRequestTimestamp;
-    }
-
-    @JsonProperty("last_request_timestamp")
-    public void setLastRequestTimestamp(java.lang.String lastRequestTimestamp) {
-        this.lastRequestTimestamp = lastRequestTimestamp;
-    }
-
-    public ServiceStatus withLastRequestTimestamp(java.lang.String lastRequestTimestamp) {
-        this.lastRequestTimestamp = lastRequestTimestamp;
-        return this;
-    }
-
     @JsonAnyGetter
     public Map<java.lang.String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -237,7 +210,7 @@ public class ServiceStatus {
 
     @Override
     public java.lang.String toString() {
-        return ((((((((((((((((((((((((("ServiceStatus"+" [moduleName=")+ moduleName)+", version=")+ version)+", gitCommitHash=")+ gitCommitHash)+", releaseTags=")+ releaseTags)+", hash=")+ hash)+", url=")+ url)+", node=")+ node)+", up=")+ up)+", status=")+ status)+", health=")+ health)+", lastRequestTimestamp=")+ lastRequestTimestamp)+", additionalProperties=")+ additionalProperties)+"]");
+        return ((((((((((((((((((((("ServiceStatus"+" [moduleName=")+ moduleName)+", version=")+ version)+", gitCommitHash=")+ gitCommitHash)+", releaseTags=")+ releaseTags)+", hash=")+ hash)+", url=")+ url)+", up=")+ up)+", status=")+ status)+", health=")+ health)+", additionalProperties=")+ additionalProperties)+"]");
     }
 
 }

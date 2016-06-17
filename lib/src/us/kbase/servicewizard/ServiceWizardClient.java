@@ -10,7 +10,6 @@ import us.kbase.auth.AuthToken;
 import us.kbase.common.service.JsonClientCaller;
 import us.kbase.common.service.JsonClientException;
 import us.kbase.common.service.RpcContext;
-import us.kbase.common.service.UnauthorizedException;
 
 /**
  * <p>Original spec-file module name: ServiceWizard</p>
@@ -26,35 +25,6 @@ public class ServiceWizardClient {
      */
     public ServiceWizardClient(URL url) {
         caller = new JsonClientCaller(url);
-    }
-    /** Constructs a client with a custom URL.
-     * @param url the URL of the service.
-     * @param token the user's authorization token.
-     * @throws UnauthorizedException if the token is not valid.
-     * @throws IOException if an IOException occurs when checking the token's
-     * validity.
-     */
-    public ServiceWizardClient(URL url, AuthToken token) throws UnauthorizedException, IOException {
-        caller = new JsonClientCaller(url, token);
-    }
-
-    /** Constructs a client with a custom URL.
-     * @param url the URL of the service.
-     * @param user the user name.
-     * @param password the password for the user name.
-     * @throws UnauthorizedException if the credentials are not valid.
-     * @throws IOException if an IOException occurs when checking the user's
-     * credentials.
-     */
-    public ServiceWizardClient(URL url, String user, String password) throws UnauthorizedException, IOException {
-        caller = new JsonClientCaller(url, user, password);
-    }
-
-    /** Get the token this client uses to communicate with the server.
-     * @return the authorization token.
-     */
-    public AuthToken getToken() {
-        return caller.getToken();
     }
 
     /** Get the URL of the service with which this client communicates.
@@ -156,46 +126,41 @@ public class ServiceWizardClient {
     /**
      * <p>Original spec-file function name: start</p>
      * <pre>
+     * Try to start the specified service; this will generate an error if the
+     * specified service cannot be started.  If the startup did not give any
+     * errors, then the status of the running service is provided.
      * </pre>
      * @param   service   instance of type {@link us.kbase.servicewizard.Service Service}
+     * @return   parameter "status" of type {@link us.kbase.servicewizard.ServiceStatus ServiceStatus}
      * @throws IOException if an IO exception occurs
      * @throws JsonClientException if a JSON RPC exception occurs
      */
-    public void start(Service service, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+    public ServiceStatus start(Service service, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
         List<Object> args = new ArrayList<Object>();
         args.add(service);
-        TypeReference<Object> retType = new TypeReference<Object>() {};
-        caller.jsonrpcCall("ServiceWizard.start", args, retType, false, true, jsonRpcContext);
+        TypeReference<List<ServiceStatus>> retType = new TypeReference<List<ServiceStatus>>() {};
+        List<ServiceStatus> res = caller.jsonrpcCall("ServiceWizard.start", args, retType, true, false, jsonRpcContext);
+        return res.get(0);
     }
 
     /**
      * <p>Original spec-file function name: stop</p>
      * <pre>
+     * Try to stop the specified service; this will generate an error if the
+     * specified service cannot be stopped.  If the stop did not give any
+     * errors, then the status of the stopped service is provided.
      * </pre>
      * @param   service   instance of type {@link us.kbase.servicewizard.Service Service}
+     * @return   parameter "status" of type {@link us.kbase.servicewizard.ServiceStatus ServiceStatus}
      * @throws IOException if an IO exception occurs
      * @throws JsonClientException if a JSON RPC exception occurs
      */
-    public void stop(Service service, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+    public ServiceStatus stop(Service service, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
         List<Object> args = new ArrayList<Object>();
         args.add(service);
-        TypeReference<Object> retType = new TypeReference<Object>() {};
-        caller.jsonrpcCall("ServiceWizard.stop", args, retType, false, true, jsonRpcContext);
-    }
-
-    /**
-     * <p>Original spec-file function name: pause</p>
-     * <pre>
-     * </pre>
-     * @param   service   instance of type {@link us.kbase.servicewizard.Service Service}
-     * @throws IOException if an IO exception occurs
-     * @throws JsonClientException if a JSON RPC exception occurs
-     */
-    public void pause(Service service, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
-        List<Object> args = new ArrayList<Object>();
-        args.add(service);
-        TypeReference<Object> retType = new TypeReference<Object>() {};
-        caller.jsonrpcCall("ServiceWizard.pause", args, retType, false, true, jsonRpcContext);
+        TypeReference<List<ServiceStatus>> retType = new TypeReference<List<ServiceStatus>>() {};
+        List<ServiceStatus> res = caller.jsonrpcCall("ServiceWizard.stop", args, retType, true, false, jsonRpcContext);
+        return res.get(0);
     }
 
     /**
@@ -218,10 +183,14 @@ public class ServiceWizardClient {
     /**
      * <p>Original spec-file function name: get_service_status</p>
      * <pre>
-     * For a given service, check on the status.  If the service is down, attempt to restart.
+     * For a given service, check on the status.  If the service is down or
+     * not running, this function will attempt to start or restart the
+     * service once, then return the status.
+     * This function will throw an error if the specified service cannot be
+     * found or encountered errors on startup.
      * </pre>
      * @param   service   instance of type {@link us.kbase.servicewizard.Service Service}
-     * @return   instance of type {@link us.kbase.servicewizard.ServiceStatus ServiceStatus}
+     * @return   parameter "status" of type {@link us.kbase.servicewizard.ServiceStatus ServiceStatus}
      * @throws IOException if an IO exception occurs
      * @throws JsonClientException if a JSON RPC exception occurs
      */

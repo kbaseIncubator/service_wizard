@@ -14,7 +14,10 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 /**
  * <p>Original spec-file type: ListServiceStatusParams</p>
- * 
+ * <pre>
+ * not yet implemented
+ * funcdef pause(Service service) returns (ServiceStatus status);
+ * </pre>
  * 
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
