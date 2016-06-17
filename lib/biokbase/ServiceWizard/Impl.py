@@ -3,7 +3,7 @@ import os
 import time
 import yaml
 import subprocess
-from  pprint import pprint, pformat
+from pprint import pprint, pformat
 import traceback
 import gdapi
 import json
@@ -119,6 +119,9 @@ class ServiceWizard:
                 "labels" : {
                     'us.kbase.module.version':module_version['version'],
                     'us.kbase.module.git_commit_hash':module_version['git_commit_hash']
+                },
+                "environment" : {
+                    'KBASE_ENDPOINT' : self.KBASE_ENDPOINT
                 }
             }
 
@@ -212,6 +215,10 @@ class ServiceWizard:
         if 'svc-hostname' not in config:
             raise ValueError('"svc-hostname" configuration variable not set"')
         self.SVC_HOSTNAME = config['svc-hostname']
+
+        if 'kbase-endpoint' not in config:
+            raise ValueError('"kbase-endpoint" configuration variable not set"')
+        self.KBASE_ENDPOINT = config['kbase-endpoint']
 
         if 'nginx-port' not in config:
             raise ValueError('"nginx-port" configuration variable not set"')
