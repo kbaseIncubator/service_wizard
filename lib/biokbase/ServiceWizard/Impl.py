@@ -129,6 +129,37 @@ class ServiceWizard:
         return url
 
 
+    def get_single_service_status(self, module_version):
+
+        stack_name = self.get_stack_name(module_version)
+        rancher = gdapi.Client(url=self.RANCHER_URL,access_key=self.RANCHER_ACCESS_KEY,secret_key=self.RANCHER_SECRET_KEY)
+        
+        # lookup environment id (this may become a deployment config option)
+        slist = rancher.list_environment(name=stack_name)
+        if len(slist) == 0: 
+            return None
+        eid = slist[0]['id']
+
+        # get service info
+        entry = rancher.list_service(environmentId=eid, name=self.get_service_name(module_version))
+        if len(entry) == 0: 
+            return None
+        entry = entry[0]
+
+        status = {
+            'module_name':module_version['module_name'],
+            'release_tags':module_version['release_tags'],
+            'git_commit_hash':module_version['git_commit_hash'],
+            'hash':module_version['git_commit_hash'],
+            'version':module_version['version'],
+            'url': self.get_service_url(module_version),
+            'status' : entry['state'],
+            'health' : entry['healthState'],
+            'up' : 1 if entry['state']=='active' else 0
+        }
+        return status
+
+
     #END_CLASS_HEADER
 
     # config contains contents of config file in a hash or None if it couldn't
@@ -221,7 +252,7 @@ class ServiceWizard:
         docker_compose, rancher_compose = self.create_compose_files(mv)
 
         # To do: try to use API to send docker-compose directly instead of needing to write to disk
-        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()))
+        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
         os.makedirs(ymlpath)
         docker_compose_path=ymlpath + '/docker-compose.yml'
         rancher_compose_path=ymlpath + '/rancher-compose.yml'
@@ -275,10 +306,14 @@ class ServiceWizard:
         # lookup the module info from the catalog
         cc = Catalog(self.CATALOG_URL, token=ctx['token'])
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
         
         docker_compose, rancher_compose = self.create_compose_files(mv)
 
-        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()))
+        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
         os.makedirs(ymlpath)
         docker_compose_path=ymlpath + '/docker-compose.yml'
         rancher_compose_path=ymlpath + '/rancher-compose.yml'
@@ -421,44 +456,29 @@ class ServiceWizard:
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN get_service_status
+
         # TODO: handle case where version is not registered in the catalog- this may be the case for core services
         #       that were not registered in the usual way.
+
+        # first get infor from the catalog- it must be a dynamic service
         cc = Catalog(self.CATALOG_URL, token=ctx['token'])
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
 
-        stack_name = self.get_stack_name(mv)
+        status = self.get_single_service_status(mv)
 
-        rancher = gdapi.Client(url=self.RANCHER_URL,
-                      access_key=self.RANCHER_ACCESS_KEY,
-                      secret_key=self.RANCHER_SECRET_KEY)
-        
-        returnVal = None
+        # if we cannot get the status, or it is not up, then try to start it
+        if status is None or status['up']!=1:
+            self.start(ctx, service)
+            # try to get status
+            status = self.get_single_service_status(mv)
 
-        # get environment id
-        slist = rancher.list_environment(name=stack_name)
-        if len(slist) == 0: 
-            self.start(service)
-            return None
-        eid = slist[0]['id']
+        # return the status
+        returnVal = status
 
-        # get service info
-        entry = rancher.list_service(environmentId=eid, name=self.get_service_name(mv))
-        if len(entry) == 0: 
-            self.start(service)
-            return None
-        entry = entry[0]
-
-        returnVal = {'module_name' : service['module_name'], 'status' : entry['state'], 'health' : entry['healthState']}
-
-        returnVal['hash'] = mv['git_commit_hash']
-        if returnVal['status'] == 'active':
-          returnVal['up'] = 1
-        else:
-          returnVal['up'] = 0
-        returnVal['url'] = self.get_service_url(mv)
-        returnVal['version'] = mv['version']
-        returnVal['release_tags'] = mv['release_tags']
-        returnVal['git_commit_hash'] = mv['git_commit_hash']
         #END get_service_status
 
         # At some point might do deeper type checking...
