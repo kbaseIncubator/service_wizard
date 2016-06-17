@@ -725,7 +725,7 @@ boolean is an int
 
 =head2 get_service_log
 
-  $log = $obj->get_service_log($params)
+  $logs = $obj->get_service_log($params)
 
 =over 4
 
@@ -735,14 +735,16 @@ boolean is an int
 
 <pre>
 $params is a ServiceWizard.GetServiceLogParams
-$log is a ServiceWizard.ServiceLog
+$logs is a reference to a list where each element is a ServiceWizard.ServiceLog
 GetServiceLogParams is a reference to a hash where the following keys are defined:
 	service has a value which is a ServiceWizard.Service
+	instance_id has a value which is a string
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
 ServiceLog is a reference to a hash where the following keys are defined:
-	log has a value which is a string
+	instance_id has a value which is a string
+	log has a value which is a reference to a list where each element is a string
 
 </pre>
 
@@ -751,14 +753,16 @@ ServiceLog is a reference to a hash where the following keys are defined:
 =begin text
 
 $params is a ServiceWizard.GetServiceLogParams
-$log is a ServiceWizard.ServiceLog
+$logs is a reference to a list where each element is a ServiceWizard.ServiceLog
 GetServiceLogParams is a reference to a hash where the following keys are defined:
 	service has a value which is a ServiceWizard.Service
+	instance_id has a value which is a string
 Service is a reference to a hash where the following keys are defined:
 	module_name has a value which is a string
 	version has a value which is a string
 ServiceLog is a reference to a hash where the following keys are defined:
-	log has a value which is a string
+	instance_id has a value which is a string
+	log has a value which is a reference to a list where each element is a string
 
 
 =end text
@@ -1061,7 +1065,8 @@ module_names has a value which is a reference to a list where each element is a 
 
 <pre>
 a reference to a hash where the following keys are defined:
-log has a value which is a string
+instance_id has a value which is a string
+log has a value which is a reference to a list where each element is a string
 
 </pre>
 
@@ -1070,7 +1075,8 @@ log has a value which is a string
 =begin text
 
 a reference to a hash where the following keys are defined:
-log has a value which is a string
+instance_id has a value which is a string
+log has a value which is a reference to a list where each element is a string
 
 
 =end text
@@ -1085,6 +1091,12 @@ log has a value which is a string
 
 
 
+=item Description
+
+optional instance_id to get logs for a specific instance.  Otherwise logs from all instances
+are returned, TODO: add line number constraints.
+
+
 =item Definition
 
 =begin html
@@ -1092,6 +1104,7 @@ log has a value which is a string
 <pre>
 a reference to a hash where the following keys are defined:
 service has a value which is a ServiceWizard.Service
+instance_id has a value which is a string
 
 </pre>
 
@@ -1101,6 +1114,7 @@ service has a value which is a ServiceWizard.Service
 
 a reference to a hash where the following keys are defined:
 service has a value which is a ServiceWizard.Service
+instance_id has a value which is a string
 
 
 =end text

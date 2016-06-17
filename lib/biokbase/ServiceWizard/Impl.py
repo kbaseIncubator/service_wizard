@@ -12,6 +12,8 @@ from StringIO import StringIO
 import re
 from urlparse import urlparse
 
+from websocket import create_connection
+
 import base64
 import hashlib
 
@@ -38,7 +40,7 @@ class ServiceWizard:
     #########################################
     VERSION = "0.3.0"
     GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "803c52113fd29c87cbfd59e379a3010478595c44"
+    GIT_COMMIT_HASH = "4c61efe440d895e9a54cd8932643603143295713"
     
     #BEGIN_CLASS_HEADER
 
@@ -651,23 +653,27 @@ class ServiceWizard:
 
     def get_service_log(self, ctx, params):
         """
-        :param params: instance of type "GetServiceLogParams" -> structure:
-           parameter "service" of type "Service" (module_name - the name of
-           the service module, case-insensitive version     - specify the
-           service version, which can be either: (1) full git commit hash of
-           the module version (2) semantic version or semantic version
-           specification Note: semantic version lookup will only work for
-           released versions of the module. (3) release tag, which is one of:
-           dev | beta | release This information is always fetched from the
-           Catalog, so for more details on specifying the version, see the
-           Catalog documentation for the get_module_version method.) ->
-           structure: parameter "module_name" of String, parameter "version"
-           of String
-        :returns: instance of type "ServiceLog" -> structure: parameter "log"
-           of String
+        :param params: instance of type "GetServiceLogParams" (optional
+           instance_id to get logs for a specific instance.  Otherwise logs
+           from all instances are returned, TODO: add line number
+           constraints.) -> structure: parameter "service" of type "Service"
+           (module_name - the name of the service module, case-insensitive
+           version     - specify the service version, which can be either:
+           (1) full git commit hash of the module version (2) semantic
+           version or semantic version specification Note: semantic version
+           lookup will only work for released versions of the module. (3)
+           release tag, which is one of: dev | beta | release This
+           information is always fetched from the Catalog, so for more
+           details on specifying the version, see the Catalog documentation
+           for the get_module_version method.) -> structure: parameter
+           "module_name" of String, parameter "version" of String, parameter
+           "instance_id" of String
+        :returns: instance of list of type "ServiceLog" -> structure:
+           parameter "instance_id" of String, parameter "log" of list of
+           String
         """
         # ctx is the context object
-        # return variables are: log
+        # return variables are: logs
         #BEGIN get_service_log
         service = params['service']
         user_id = ctx['user_id']
@@ -696,27 +702,61 @@ class ServiceWizard:
 
         #service_info = rancher.list_servicess(name=self.get_service_name(mv))
 
-        GET_SERVICE_URL = self.RANCHER_URL + '/v1/services?name=' + self.get_service_name(mv)
+        GET_SERVICE_URL = self.RANCHER_URL + '/v1/services?name=' + self.get_service_name(mv) + '&include=instances'
         service_info = requests.get(GET_SERVICE_URL, auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False).json()
 
-        pprint(service_info)
-        #exportConfigURL=stacks[0]['actions']['exportconfig']
-        #    payload = {'serviceIds':[]}
-        #    configReq = requests.post(exportConfigURL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False)
-        #    export=configReq.json()
-        #    docker_compose = yaml.load(export['dockerComposeConfig'])
-        #    rancher_compose = yaml.load(export['rancherComposeConfig'])
+        if len(service_info['data'])==0:
+            raise ValueError('Unable to fetch service information.  That service version may not be available.')
 
-        log = {}
+        if len(service_info['data'][0]['instances'])==0:
+            raise ValueError('The service version specified has no available container instances.')
+
+        instances = service_info['data'][0]['instances']
+
+        #pprint(instances)
+
+        match_instance_id = False
+        if 'instance_id' in params:
+            match_instance_id = True
+
+        logs = []
+        for i in instances:
+            if match_instance_id and params['instance_id']!=i['id']:
+                continue;
+            LOG_URL = i['actions']['logs']
+            payload = { 'follow':False }
+            log_ws = requests.post(LOG_URL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False).json()
+            #pprint(log_ws)
+            SOCKET_URL = log_ws['url'] + '?token=' + log_ws['token']
+            #print(SOCKET_URL)
+            log_socket = create_connection(SOCKET_URL)
+            lines = [];
+            while True:
+                try:
+                    result =  log_socket.recv()
+                    if result is None: break
+                    lines.append(result)
+                except:
+                    break
+            logs.append({'instance_id':i['id'], 'log':lines })
+
+
+#print "Sending 'Hello, World'..."
+#ws.send("Hello, World")
+#print "Sent"
+#print "Reeiving..."
+#print "Received '%s'" % result
+#ws.close()
+
 
         #END get_service_log
 
         # At some point might do deeper type checking...
-        if not isinstance(log, dict):
+        if not isinstance(logs, list):
             raise ValueError('Method get_service_log return value ' +
-                             'log is not type dict as required.')
+                             'logs is not type list as required.')
         # return the results
-        return [log]
+        return [logs]
 
     def status(self, ctx):
         #BEGIN_STATUS
