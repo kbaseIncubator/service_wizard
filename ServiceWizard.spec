@@ -8,35 +8,72 @@ module ServiceWizard {
     funcdef version() returns (string version);
 
     /*
-        version - unified version field including semantic version, git commit hash and
-            case of last version of tag (dev/beta/release).
+        module_name - the name of the service module, case-insensitive
+        version     - specify the service version, which can be either:
+                        (1) full git commit hash of the module version
+                        (2) semantic version or semantic version specification
+                            Note: semantic version lookup will only work for 
+                            released versions of the module.
+                        (3) release tag, which is one of: dev | beta | release
+        
+        This information is always fetched from the Catalog, so for more details
+        on specifying the version, see the Catalog documentation for the
+        get_module_version method.
     */
     typedef structure {
         string module_name;
         string version;
     } Service;
 
-    /* version is the semantic version of the module */
+    /* 
+        module_name     - name of the service module
+        version         - semantic version number of the service module
+        git_commit_hash - git commit hash of the service module
+        release_tags    - list of release tags currently for this service module (dev/beta/release)
+
+        url             - the url of the service
+
+        up              - 1 if the service is up, 0 otherwise
+        status          - status of the service as reported by rancher
+        health          - health of the service as reported by Rancher
+
+        TODO: 
+          add something to return: string last_request_timestamp;
+    */
     typedef structure {
         string module_name;
-
         string version;
+        string git_commit_hash;
+
+        list <string> release_tags;
+
         string hash;
 
         string url;
-        string node;
 
         boolean up;
         string status;
         string health;
-        string last_request_timestamp;
     } ServiceStatus;
 
 
-    funcdef start(Service service) returns () authentication required;
-    funcdef stop(Service service) returns () authentication required;
-    funcdef pause(Service service) returns () authentication required;
+    /* 
+        Try to start the specified service; this will generate an error if the
+        specified service cannot be started.  If the startup did not give any
+        errors, then the status of the running service is provided.
+    */
+    funcdef start(Service service) returns (ServiceStatus status);
 
+    /* 
+        Try to stop the specified service; this will generate an error if the
+        specified service cannot be stopped.  If the stop did not give any
+        errors, then the status of the stopped service is provided.
+    */
+    funcdef stop(Service service) returns (ServiceStatus status);
+
+    /* not yet implemented
+    funcdef pause(Service service) returns (ServiceStatus status);
+    */
 
 
     typedef structure {
@@ -46,12 +83,17 @@ module ServiceWizard {
 
     funcdef list_service_status(ListServiceStatusParams params) returns (list<ServiceStatus>);
 
+    /*
+        For a given service, check on the status.  If the service is down or
+        not running, this function will attempt to start or restart the
+        service once, then return the status.
 
-    funcdef get_service_status(Service service) returns (ServiceStatus);
+        This function will throw an error if the specified service cannot be
+        found or encountered errors on startup.
+    */
+    funcdef get_service_status(Service service) returns (ServiceStatus status);
 
 
-
-
-
+    funcdef get_service_status_without_restart(Service service) returns (ServiceStatus status);
 
 };

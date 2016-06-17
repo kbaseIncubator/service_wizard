@@ -3,7 +3,7 @@ import os
 import time
 import yaml
 import subprocess
-from  pprint import pprint
+from  pprint import pprint, pformat
 import traceback
 import gdapi
 import json
@@ -11,6 +11,11 @@ import zipfile
 from StringIO import StringIO
 import re
 from urlparse import urlparse
+
+import base64
+import hashlib
+
+
 from biokbase.catalog.Client import Catalog
 #END_HEADER
 
@@ -30,11 +35,131 @@ class ServiceWizard:
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
     #########################################
-    VERSION = "0.0.1"
-    GIT_URL = "https://github.com/msneddon/service_wizard"
-    GIT_COMMIT_HASH = "84d4cbff7a256f9c6f28bdb7f1dcad57312b58e3"
+    VERSION = "0.3.0"
+    GIT_URL = "git@github.com:msneddon/service_wizard.git"
+    GIT_COMMIT_HASH = "1979e95ba54db9fe1b346042163648c7b80d139c"
     
     #BEGIN_CLASS_HEADER
+
+    RANCHER_COMPOSE_BIN = 'rancher-compose'
+    RANCHER_URL = ''
+    USE_RANCHER_ACCESS_KEY = True
+    RANCHER_ACCESS_KEY = ''
+    RANCHER_SECRET_KEY = ''
+
+    CATALOG_URL = ''
+    SCRATCH_DIR = ''
+
+    SVC_HOSTNAME = ''
+    NGINX_PORT = ''
+
+    # Given module information, generate a unique stack name for that version
+    def get_stack_name(self, module_version):
+        name = module_version['module_name'] #+ '-'+module_version['version'] + '-' + module_version['git_commit_hash'][:7]
+        # stack names must have dashes, not underscores
+        name = name.replace('_','-')
+        # stack names must have dashes, not dots
+        name = name.replace('.','-')
+        return name
+
+    def get_module_name_hash(self, module_name):
+        return hashlib.md5(module_name).hexdigest()[:20]
+
+    def get_service_name(self, module_version):
+        # hash the module name so we don't have to deal with illegal characters, length limits, etc
+        module_name_hash = self.get_module_name_hash(module_version['module_name'])
+        git_commit_hash = module_version['git_commit_hash']
+        return module_name_hash + '-' + git_commit_hash
+
+    def get_dns_service_name(self, module_version):
+        dns_service_name = module_version['git_commit_hash']
+        return dns_service_name
+
+    # Build the docker_compose and rancher_compose files
+    def create_compose_files(self, module_version):
+        # in progress: pull the existing config from rancher and include in new config
+        # 1) look up service name to get project/environment
+        # 2) POST  {"serviceIds":[]} to /v1/projects/$projid/environments/$envid/?action=exportconfig
+        # parse dockerComposeConfig and rancherComposeConfig as yml
+
+        # construct the service names
+        service_name = self.get_service_name(module_version)
+        dns_service_name = self.get_dns_service_name(module_version)
+
+        rancher = gdapi.Client(url=self.RANCHER_URL,
+                      access_key=self.RANCHER_ACCESS_KEY,
+                      secret_key=self.RANCHER_SECRET_KEY)
+
+        stacks = rancher.list_environment(name=service_name)
+
+        # there should be only one stack, but what if there is more than one?
+        if (len(stacks) > 0):
+            exportConfigURL=stacks[0]['actions']['exportconfig']
+
+            payload = {'serviceIds':[]}
+            configReq = requests.post(exportConfigURL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False)
+            export=configReq.json()
+            docker_compose = yaml.load(export['dockerComposeConfig'])
+            rancher_compose = yaml.load(export['rancherComposeConfig'])
+        else:
+            docker_compose = {}
+            rancher_compose = {}
+
+        docker_compose[dns_service_name] = {
+                "image" : "rancher/dns-service",
+                "links" : [ service_name+':'+service_name ]
+            }
+        docker_compose[service_name] = {
+                "image" : module_version['docker_img_name']
+            }
+
+        rancher_compose[service_name] = {
+                "scale" : 1
+            }
+
+        return docker_compose, rancher_compose
+
+    def get_service_url(self, module_version):
+        url = "https://{0}:{1}/dynserv/{3}.{2}"
+        url = url.format(
+                    self.SVC_HOSTNAME, 
+                    self.NGINX_PORT, 
+                    self.get_stack_name(module_version),
+                    self.get_dns_service_name(module_version))
+        return url
+
+
+    def get_single_service_status(self, module_version):
+
+        stack_name = self.get_stack_name(module_version)
+        rancher = gdapi.Client(url=self.RANCHER_URL,access_key=self.RANCHER_ACCESS_KEY,secret_key=self.RANCHER_SECRET_KEY)
+        
+        # lookup environment id (this may become a deployment config option)
+        slist = rancher.list_environment(name=stack_name)
+        if len(slist) == 0: 
+            return None
+        eid = slist[0]['id']
+
+        # get service info
+        entry = rancher.list_service(environmentId=eid, name=self.get_service_name(module_version))
+        if len(entry) == 0: 
+            return None
+        entry = entry[0]
+
+        status = {
+            'module_name':module_version['module_name'],
+            'release_tags':module_version['release_tags'],
+            'git_commit_hash':module_version['git_commit_hash'],
+            'hash':module_version['git_commit_hash'],
+            'version':module_version['version'],
+            'url': self.get_service_url(module_version),
+            'status' : entry['state'],
+            'health' : entry['healthState'],
+            'up' : 1 if entry['state']=='active' else 0
+        }
+        return status
+
+
     #END_CLASS_HEADER
 
     # config contains contents of config file in a hash or None if it couldn't
@@ -47,32 +172,114 @@ class ServiceWizard:
             self.deploy_config['svc-hostname'] = up.hostname
         if 'nginx-port' not in config:
             self.deploy_config['nginx-port'] = 443
+
+        if 'rancher-compose-bin' in config:
+            self.RANCHER_COMPOSE_BIN = config['rancher-compose-bin']
+
+        if 'catalog-url' not in config:
+            raise ValueError('"catalog-url" configuration variable not set"')
+        self.CATALOG_URL = config['catalog-url']
+
+        if 'rancher-env-url' not in config:
+            raise ValueError('"rancher-env-url" configuration variable not set"')
+        self.RANCHER_URL = config['rancher-env-url']
+
+        if 'temp-dir' not in config:
+            raise ValueError('"temp-dir" configuration variable not set"')
+        self.SCRATCH_DIR = config['temp-dir']
+
+        if 'svc-hostname' not in config:
+            raise ValueError('"svc-hostname" configuration variable not set"')
+        self.SVC_HOSTNAME = config['svc-hostname']
+
+        if 'nginx-port' not in config:
+            raise ValueError('"nginx-port" configuration variable not set"')
+        self.NGINX_PORT = config['nginx-port']
+
+        if not os.path.isfile(self.RANCHER_COMPOSE_BIN):
+            print('WARNING: rancher-compose (='+self.RANCHER_COMPOSE_BIN+') command not found.  Set absolute location with "rancher-compose-bin" configuration.')
+
+        if ('access-key' not in config) or ('secret-key' not in config):
+            self.USE_RANCHER_ACCESS_KEY = False
+            print('WARNING: No "access-key" and "secret-key" set for Rancher.  Will connect unauthenticated, which should only be used in test environments.')
+        else:
+            self.RANCHER_ACCESS_KEY = config['access-key']
+            self.RANCHER_SECRET_KEY = config['secret-key']
+
         #END_CONSTRUCTOR
         pass
     
 
-    def start(self, ctx, service):
+    def version(self, ctx):
+        """
+        Get the version of the deployed service wizard endpoint.
+        :returns: instance of String
+        """
         # ctx is the context object
+        # return variables are: version
+        #BEGIN version
+        version=self.VERSION
+        #END version
+
+        # At some point might do deeper type checking...
+        if not isinstance(version, basestring):
+            raise ValueError('Method version return value ' +
+                             'version is not type basestring as required.')
+        # return the results
+        return [version]
+
+    def start(self, ctx, service):
+        """
+        Try to start the specified service; this will generate an error if the
+        specified service cannot be started.  If the startup did not give any
+        errors, then the status of the running service is provided.
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceStatus" (module_name     - name of
+           the service module version         - semantic version number of
+           the service module git_commit_hash - git commit hash of the
+           service module release_tags    - list of release tags currently
+           for this service module (dev/beta/release) url             - the
+           url of the service up              - 1 if the service is up, 0
+           otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
+        """
+        # ctx is the context object
+        # return variables are: status
         #BEGIN start
-        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
-        mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
-        shash = mv['git_commit_hash']
-        # Use the name returned from the catalog service
-        catalog_module_name = mv['module_name']
-        sname = "{0}-{1}".format(catalog_module_name,shash) # service name
-        docker_compose = { shash : {
-                   "image" : "rancher/dns-service",
-                   "links" : ["{0}:{0}".format(sname)]
-                 },
-                 sname : {
-                   "image" : mv['docker_img_name']
-                 }
-               }
+
+        print('START REQUEST: ' + str(service))
+
+        # First, lookup the module information from the catalog, make sure it is a service
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+
+        # Construct the docker compose and rancher compose file
+        docker_compose, rancher_compose = self.create_compose_files(mv)
 
         # To do: try to use API to send docker-compose directly instead of needing to write to disk
-        ymlpath = self.deploy_config['temp-dir'] + '/' + catalog_module_name + '/' + str(int(time.time()))
+        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
         os.makedirs(ymlpath)
-
         docker_compose_path=ymlpath + '/docker-compose.yml'
         rancher_compose_path=ymlpath + '/rancher-compose.yml'
 
@@ -80,103 +287,207 @@ class ServiceWizard:
             outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
         # can be extended later
         with open(rancher_compose_path, 'w') as outfile:
-            outfile.write( yaml.safe_dump({sname:{'scale':1}}, default_flow_style=False) )
+            outfile.write( yaml.safe_dump(rancher_compose, default_flow_style=False) )
+
+        # setup Rancher creds and options
         eenv = os.environ.copy()
-        eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
-        eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
-        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
-        cmd_list = ['rancher-compose', '-p', catalog_module_name, 'up', '-d']
+        eenv['RANCHER_URL'] = self.RANCHER_URL
+        if self.USE_RANCHER_ACCESS_KEY:
+            eenv['RANCHER_ACCESS_KEY'] = self.RANCHER_ACCESS_KEY
+            eenv['RANCHER_SECRET_KEY'] = self.RANCHER_SECRET_KEY
+
+        # create and run the rancher-compose up command
+        stack_name = self.get_stack_name(mv)
+        print('STARTING STACK: ' + stack_name)
+        cmd_list = [self.RANCHER_COMPOSE_BIN, '-p', stack_name, 'up', '-d']
         try:
-            tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv, cwd=ymlpath)
-            stdout, stderr = tool_process.communicate()
-            pprint(stdout)
-            pprint(stderr)
+            p = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, env=eenv, cwd=ymlpath)
+            stdout, stderr = p.communicate()
         except:
             pprint(traceback.format_exc())
+            raise ValueError('Unable to start service: Error calling rancher-compose: '+traceback.format_exc())
+
+        print('STDOUT:')
+        print(stdout)
+        print('STDERR:')
+        print(stderr)
+
+        if p.returncode != 0:
+            raise ValueError('Unable to start service: Error was: \n' + stdout);
+
+        status = self.get_single_service_status(mv)
+
         #END start
-        pass
+
+        # At some point might do deeper type checking...
+        if not isinstance(status, dict):
+            raise ValueError('Method start return value ' +
+                             'status is not type dict as required.')
+        # return the results
+        return [status]
 
     def stop(self, ctx, service):
+        """
+        Try to stop the specified service; this will generate an error if the
+        specified service cannot be stopped.  If the stop did not give any
+        errors, then the status of the stopped service is provided.
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceStatus" (module_name     - name of
+           the service module version         - semantic version number of
+           the service module git_commit_hash - git commit hash of the
+           service module release_tags    - list of release tags currently
+           for this service module (dev/beta/release) url             - the
+           url of the service up              - 1 if the service is up, 0
+           otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
+        """
         # ctx is the context object
+        # return variables are: status
         #BEGIN stop
-        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
-        mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
-        shash = mv['git_commit_hash']
-        # Use the name returned from the catalog service
-        catalog_module_name = mv['module_name']
-        sname = "{0}-{1}".format(catalog_module_name,shash) # service name
-        docker_compose = { shash : {
-                   "image" : "rancher/dns-service",
-                   "links" : ["{0}:{0}".format(sname)]
-                 },
-                 sname : {
-                   "image" : mv['docker_img_name']
-                 }
-               }
-        with open('docker-compose.yml', 'w') as outfile:
+        print('STOP REQUEST: ' + str(service))
+
+        # lookup the module info from the catalog
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        
+        docker_compose, rancher_compose = self.create_compose_files(mv)
+
+        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
+        os.makedirs(ymlpath)
+        docker_compose_path=ymlpath + '/docker-compose.yml'
+        rancher_compose_path=ymlpath + '/rancher-compose.yml'
+
+        with open(docker_compose_path, 'w') as outfile:
             outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
-        # can be extended later
-        with open('rancher-compose.yml', 'w') as outfile:
-            outfile.write( yaml.safe_dump({sname:{'scale':1}}, default_flow_style=False) )
+        with open(rancher_compose_path, 'w') as outfile:
+            outfile.write( yaml.safe_dump(rancher_compose, default_flow_style=False) )
+
         eenv = os.environ.copy()
-        eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
-        eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
-        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
-        cmd_list = ['rancher-compose', '-p', catalog_module_name, 'stop']
+        eenv['RANCHER_URL'] = self.RANCHER_URL
+        eenv['RANCHER_ACCESS_KEY'] = self.RANCHER_ACCESS_KEY
+        eenv['RANCHER_SECRET_KEY'] = self.RANCHER_SECRET_KEY
+
+        stack_name = self.get_stack_name(mv)
+        print('STOPPING STACK: ' + stack_name)
+        cmd_list = [self.RANCHER_COMPOSE_BIN, '-p', stack_name, 'stop']
         try:
-            tool_process = subprocess.Popen(cmd_list, stderr=subprocess.PIPE, env=eenv)
-            stdout, stderr = tool_process.communicate()
-            pprint(stdout)
-            pprint(stderr)
+            p = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, env=eenv, cwd=ymlpath)
+            stdout, stderr = p.communicate()
         except:
             pprint(traceback.format_exc())
-        #END stop
-        pass
+            raise ValueError('Unable to stop service: Error calling rancher-compose: '+traceback.format_exc())
 
-    def pause(self, ctx, service):
-        # ctx is the context object
-        #BEGIN pause
-        #END pause
-        pass
+        print('STDOUT:')
+        print(stdout)
+        print('STDERR:')
+        print(stderr)
+
+        status = self.get_single_service_status(mv)
+        #END stop
+
+        # At some point might do deeper type checking...
+        if not isinstance(status, dict):
+            raise ValueError('Method stop return value ' +
+                             'status is not type dict as required.')
+        # return the results
+        return [status]
 
     def list_service_status(self, ctx, params):
+        """
+        :param params: instance of type "ListServiceStatusParams" (not yet
+           implemented funcdef pause(Service service) returns (ServiceStatus
+           status);) -> structure: parameter "is_up" of type "boolean",
+           parameter "module_names" of list of String
+        :returns: instance of list of type "ServiceStatus" (module_name     -
+           name of the service module version         - semantic version
+           number of the service module git_commit_hash - git commit hash of
+           the service module release_tags    - list of release tags
+           currently for this service module (dev/beta/release) url          
+           - the url of the service up              - 1 if the service is up,
+           0 otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
+        """
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN list_service_status
-        client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
-                      access_key=self.deploy_config['access-key'],
-                      secret_key=self.deploy_config['secret-key'])
+        rancher = gdapi.Client(url=self.RANCHER_URL,
+                      access_key=self.RANCHER_ACCESS_KEY,
+                      secret_key=self.RANCHER_SECRET_KEY)
 
-        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
 
-        # get environment id
+        # first create simple module_name lookup based on hash (TODO: in catalog, allow us to only fetch dynamic service modules)
+        modules = cc.list_basic_module_info({'include_released':1, 'include_unreleased':1})
+        module_hash_lookup = {} # hash => module_name
+        for m in modules:
+            if 'dynamic_service' not in m or m['dynamic_service']!=1:
+                continue
+            module_hash_lookup[self.get_module_name_hash(m['module_name'])] = m['module_name']
+
+        # next get environment id (could be a config parameter in the future rather than looping over everything)
         result = []
-        slists = client.list_environment()
+        slists = rancher.list_environment()
         if len(slists) == 0: return [] # I shouldn't return 
         for slist in slists:
           eid = slist['id']
   
           # get service info
-          entries = client.list_service(environmentId = eid)
+          entries = rancher.list_service(environmentId = eid)
           if len(entries) == 0: continue
          
           for entry in entries:
             rs = entry['name'].split('-')
             if len(rs) != 2: continue
-            es = {'module_name' : rs[0], 'status' : entry['state'], 'health' : entry['healthState'], 'hash' : rs[1]}
+            es = {'status' : entry['state'], 'health' : entry['healthState'], 'hash' : rs[1]}
             #if es['health'] == 'healthy' and es['status'] == 'active':
             if es['status'] == 'active':
               es['up'] = 1
             else:
               es['up'] = 0
             try:
-              mv = cc.module_version_lookup({'module_name' : rs[0], 'lookup' : rs[1]})
-              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], mv['git_commit_hash'])
+              mv = cc.get_module_version({'module_name': module_hash_lookup[rs[0]],'version':rs[1]})
+              es['url'] = self.get_service_url(mv)
               es['version'] = mv['version']
+              es['module_name'] = mv['module_name']
+              es['release_tags'] = mv['release_tags']
+              es['git_commit_hash'] = mv['git_commit_hash']
             except:
-              # this may occur if the module version is not registered with the catalog, or is not a service
-              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], rs[0], rs[1])
-              es['version'] = 'unknown'
+              # this will occur if the module version is not registered with the catalog, or if the module
+              # was not marked as a service, or if something was started in Rancher directly and pulled
+              # from somewhere else, or an old version of the catalog was used to start this service
+              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.SVC_HOSTNAME, self.NGINX_PORT, rs[0], rs[1])
+              es['version'] = ''
+              es['release_tags'] = []
+              es['git_commit_hash'] = ''
+              es['module_name'] = '!'+rs[0]+''
             result.append(es)
 
         returnVal = result
@@ -190,46 +501,122 @@ class ServiceWizard:
         return [returnVal]
 
     def get_service_status(self, ctx, service):
+        """
+        For a given service, check on the status.  If the service is down or
+        not running, this function will attempt to start or restart the
+        service once, then return the status.
+        This function will throw an error if the specified service cannot be
+        found or encountered errors on startup.
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceStatus" (module_name     - name of
+           the service module version         - semantic version number of
+           the service module git_commit_hash - git commit hash of the
+           service module release_tags    - list of release tags currently
+           for this service module (dev/beta/release) url             - the
+           url of the service up              - 1 if the service is up, 0
+           otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
+        """
         # ctx is the context object
-        # return variables are: returnVal
+        # return variables are: status
         #BEGIN get_service_status
+
         # TODO: handle case where version is not registered in the catalog- this may be the case for core services
         #       that were not registered in the usual way.
-        cc = Catalog(self.deploy_config['catalog-url'], token=ctx['token'])
-        mv = cc.module_version_lookup({'module_name' : service['module_name'], 'lookup' : service['version']})
-        shash = mv['git_commit_hash']
-        client = gdapi.Client(url=self.deploy_config['rancher-env-url'],
-                      access_key=self.deploy_config['access-key'],
-                      secret_key=self.deploy_config['secret-key'])
-        
-        returnVal = None
 
-        # get environment id
-        slist = client.list_environment(name=service['module_name'])
-        if len(slist) == 0: return None
-        eid = slist[0]['id']
+        # first get infor from the catalog- it must be a dynamic service
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
 
-        # get service info
-        entry = client.list_service(environmentId = eid, name = '{0}-{1}'.format(service['module_name'],shash))
-        if len(entry) == 0: return None
-        entry = entry[0]
-        returnVal = {'module_name' : service['module_name'], 'status' : entry['state'], 'health' : entry['healthState']}
-        returnVal['hash'] = shash
-        #if es['health'] == 'healthy' and es['status'] == 'active':
-        if returnVal['status'] == 'active':
-          returnVal['up'] = 1
-        else:
-          returnVal['up'] = 0
-        returnVal['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], mv['module_name'], shash)
-        returnVal['version'] = mv['version']
+        status = self.get_single_service_status(mv)
+
+        # if we cannot get the status, or it is not up, then try to start it
+        if status is None or status['up']!=1:
+            self.start(ctx, service)
+            # try to get status
+            status = self.get_single_service_status(mv)
+
+        if status is None:
+            raise ValueError('Unable to get service status, or service was unable to start properly');
+
         #END get_service_status
 
         # At some point might do deeper type checking...
-        if not isinstance(returnVal, dict):
+        if not isinstance(status, dict):
             raise ValueError('Method get_service_status return value ' +
-                             'returnVal is not type dict as required.')
+                             'status is not type dict as required.')
         # return the results
-        return [returnVal]
+        return [status]
+
+    def get_service_status_without_restart(self, ctx, service):
+        """
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceStatus" (module_name     - name of
+           the service module version         - semantic version number of
+           the service module git_commit_hash - git commit hash of the
+           service module release_tags    - list of release tags currently
+           for this service module (dev/beta/release) url             - the
+           url of the service up              - 1 if the service is up, 0
+           otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
+        """
+        # ctx is the context object
+        # return variables are: status
+        #BEGIN get_service_status_without_restart
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+
+        status = self.get_single_service_status(mv)
+        #END get_service_status_without_restart
+
+        # At some point might do deeper type checking...
+        if not isinstance(status, dict):
+            raise ValueError('Method get_service_status_without_restart return value ' +
+                             'status is not type dict as required.')
+        # return the results
+        return [status]
 
     def status(self, ctx):
         #BEGIN_STATUS
