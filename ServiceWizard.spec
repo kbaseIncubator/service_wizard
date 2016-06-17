@@ -96,4 +96,19 @@ module ServiceWizard {
 
     funcdef get_service_status_without_restart(Service service) returns (ServiceStatus status);
 
+
+    typedef structure {
+        string instance_id;
+        list <string> log;
+    } ServiceLog;
+
+    /* optional instance_id to get logs for a specific instance.  Otherwise logs from all instances
+    are returned, TODO: add line number constraints. */
+    typedef structure {
+        Service service;
+        string instance_id;
+    } GetServiceLogParams;
+
+    funcdef get_service_log(GetServiceLogParams params) returns (list<ServiceLog> logs) authentication required;
+
 };
