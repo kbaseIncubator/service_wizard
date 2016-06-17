@@ -35,13 +35,14 @@ class ServiceWizard:
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
     #########################################
-    VERSION = "0.0.1"
+    VERSION = "0.3.0"
     GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "337ac08bfa22bd8b596806d7fd526e02f1241b6f"
+    GIT_COMMIT_HASH = "107f791d6c0075025ebfdec9d200606cafd14e7e"
     
     #BEGIN_CLASS_HEADER
 
     RANCHER_COMPOSE_BIN = 'rancher-compose'
+    RANCHER_URL = ''
     USE_RANCHER_ACCESS_KEY = True
     RANCHER_ACCESS_KEY = ''
     RANCHER_SECRET_KEY = ''
@@ -85,9 +86,9 @@ class ServiceWizard:
         service_name = self.get_service_name(module_version)
         dns_service_name = self.get_dns_service_name(module_version)
 
-        rancher = gdapi.Client(url=self.deploy_config['rancher-env-url'],
-                      access_key=self.deploy_config['access-key'],
-                      secret_key=self.deploy_config['secret-key'])
+        rancher = gdapi.Client(url=self.RANCHER_URL,
+                      access_key=self.RANCHER_ACCESS_KEY,
+                      secret_key=self.RANCHER_SECRET_KEY)
 
         stacks = rancher.list_environment(name=service_name)
 
@@ -96,7 +97,7 @@ class ServiceWizard:
             exportConfigURL=stacks[0]['actions']['exportconfig']
 
             payload = {'serviceIds':[]}
-            configReq = requests.post(exportConfigURL, data = json.dumps(payload), auth=(self.deploy_config['access-key'],self.deploy_config['secret-key']),verify=False)
+            configReq = requests.post(exportConfigURL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False)
             export=configReq.json()
             docker_compose = yaml.load(export['dockerComposeConfig'])
             rancher_compose = yaml.load(export['rancherComposeConfig'])
@@ -134,7 +135,6 @@ class ServiceWizard:
     # be found
     def __init__(self, config):
         #BEGIN_CONSTRUCTOR
-        self.VERSION = '0.2.0'
         self.deploy_config = config
         if 'svc-hostname' not in config:
             up = urlparse(config['rancher-env-url'])
@@ -148,6 +148,10 @@ class ServiceWizard:
         if 'catalog-url' not in config:
             raise ValueError('"catalog-url" configuration variable not set"')
         self.CATALOG_URL = config['catalog-url']
+
+        if 'rancher-env-url' not in config:
+            raise ValueError('"rancher-env-url" configuration variable not set"')
+        self.RANCHER_URL = config['rancher-env-url']
 
         if 'temp-dir' not in config:
             raise ValueError('"temp-dir" configuration variable not set"')
@@ -230,7 +234,7 @@ class ServiceWizard:
 
         # setup Rancher creds and options
         eenv = os.environ.copy()
-        eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
+        eenv['RANCHER_URL'] = self.RANCHER_URL
         if self.USE_RANCHER_ACCESS_KEY:
             eenv['RANCHER_ACCESS_KEY'] = self.RANCHER_ACCESS_KEY
             eenv['RANCHER_SECRET_KEY'] = self.RANCHER_SECRET_KEY
@@ -285,9 +289,9 @@ class ServiceWizard:
             outfile.write( yaml.safe_dump(rancher_compose, default_flow_style=False) )
 
         eenv = os.environ.copy()
-        eenv['RANCHER_URL'] = self.deploy_config['rancher-env-url']
-        eenv['RANCHER_ACCESS_KEY'] = self.deploy_config['access-key']
-        eenv['RANCHER_SECRET_KEY'] = self.deploy_config['secret-key']
+        eenv['RANCHER_URL'] = self.RANCHER_URL
+        eenv['RANCHER_ACCESS_KEY'] = self.RANCHER_ACCESS_KEY
+        eenv['RANCHER_SECRET_KEY'] = self.RANCHER_SECRET_KEY
 
         stack_name = self.get_stack_name(mv)
         print('STOPPING STACK: ' + stack_name)
@@ -327,17 +331,18 @@ class ServiceWizard:
         :returns: instance of list of type "ServiceStatus" (version is the
            semantic version of the module) -> structure: parameter
            "module_name" of String, parameter "version" of String, parameter
-           "hash" of String, parameter "url" of String, parameter "node" of
-           String, parameter "up" of type "boolean", parameter "status" of
-           String, parameter "health" of String, parameter
-           "last_request_timestamp" of String
+           "git_commit_hash" of String, parameter "release_tags" of list of
+           String, parameter "hash" of String, parameter "url" of String,
+           parameter "node" of String, parameter "up" of type "boolean",
+           parameter "status" of String, parameter "health" of String,
+           parameter "last_request_timestamp" of String
         """
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN list_service_status
-        rancher = gdapi.Client(url=self.deploy_config['rancher-env-url'],
-                      access_key=self.deploy_config['access-key'],
-                      secret_key=self.deploy_config['secret-key'])
+        rancher = gdapi.Client(url=self.RANCHER_URL,
+                      access_key=self.RANCHER_ACCESS_KEY,
+                      secret_key=self.RANCHER_SECRET_KEY)
 
         cc = Catalog(self.CATALOG_URL, token=ctx['token'])
 
@@ -373,13 +378,17 @@ class ServiceWizard:
               mv = cc.get_module_version({'module_name': module_hash_lookup[rs[0]],'version':rs[1]})
               es['url'] = self.get_service_url(mv)
               es['version'] = mv['version']
-              es['module_name'] = mv['module_name'], 
+              es['module_name'] = mv['module_name']
+              es['release_tags'] = mv['release_tags']
+              es['git_commit_hash'] = mv['git_commit_hash']
             except:
               # this will occur if the module version is not registered with the catalog, or if the module
               # was not marked as a service, or if something was started in Rancher directly and pulled
               # from somewhere else, or an old version of the catalog was used to start this service
-              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.deploy_config['svc-hostname'], self.deploy_config['nginx-port'], rs[0], rs[1])
+              es['url'] = "https://{0}:{1}/dynserv/{3}.{2}".format(self.SVC_HOSTNAME, self.NGINX_PORT, rs[0], rs[1])
               es['version'] = ''
+              es['release_tags'] = []
+              es['git_commit_hash'] = ''
               es['module_name'] = '!'+rs[0]+''
             result.append(es)
 
@@ -395,16 +404,19 @@ class ServiceWizard:
 
     def get_service_status(self, ctx, service):
         """
+        For a given service, check on the status.  If the service is down, attempt to restart.
         :param service: instance of type "Service" (version - unified version
            field including semantic version, git commit hash and case of last
            version of tag (dev/beta/release).) -> structure: parameter
            "module_name" of String, parameter "version" of String
         :returns: instance of type "ServiceStatus" (version is the semantic
            version of the module) -> structure: parameter "module_name" of
-           String, parameter "version" of String, parameter "hash" of String,
-           parameter "url" of String, parameter "node" of String, parameter
-           "up" of type "boolean", parameter "status" of String, parameter
-           "health" of String, parameter "last_request_timestamp" of String
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "node" of
+           String, parameter "up" of type "boolean", parameter "status" of
+           String, parameter "health" of String, parameter
+           "last_request_timestamp" of String
         """
         # ctx is the context object
         # return variables are: returnVal
@@ -416,21 +428,24 @@ class ServiceWizard:
 
         stack_name = self.get_stack_name(mv)
 
-        rancher = gdapi.Client(url=self.deploy_config['rancher-env-url'],
-                      access_key=self.deploy_config['access-key'],
-                      secret_key=self.deploy_config['secret-key'])
+        rancher = gdapi.Client(url=self.RANCHER_URL,
+                      access_key=self.RANCHER_ACCESS_KEY,
+                      secret_key=self.RANCHER_SECRET_KEY)
         
         returnVal = None
 
         # get environment id
         slist = rancher.list_environment(name=stack_name)
         if len(slist) == 0: 
+            self.start(service)
             return None
         eid = slist[0]['id']
 
         # get service info
         entry = rancher.list_service(environmentId=eid, name=self.get_service_name(mv))
-        if len(entry) == 0: return None
+        if len(entry) == 0: 
+            self.start(service)
+            return None
         entry = entry[0]
 
         returnVal = {'module_name' : service['module_name'], 'status' : entry['state'], 'health' : entry['healthState']}
@@ -442,6 +457,8 @@ class ServiceWizard:
           returnVal['up'] = 0
         returnVal['url'] = self.get_service_url(mv)
         returnVal['version'] = mv['version']
+        returnVal['release_tags'] = mv['release_tags']
+        returnVal['git_commit_hash'] = mv['git_commit_hash']
         #END get_service_status
 
         # At some point might do deeper type checking...

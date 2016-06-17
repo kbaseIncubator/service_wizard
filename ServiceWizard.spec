@@ -19,8 +19,11 @@ module ServiceWizard {
     /* version is the semantic version of the module */
     typedef structure {
         string module_name;
-
         string version;
+        string git_commit_hash;
+
+        list <string> release_tags;
+
         string hash;
 
         string url;
@@ -46,7 +49,9 @@ module ServiceWizard {
 
     funcdef list_service_status(ListServiceStatusParams params) returns (list<ServiceStatus>);
 
-
+    /*
+        For a given service, check on the status.  If the service is down, attempt to restart.
+    */
     funcdef get_service_status(Service service) returns (ServiceStatus);
 
 

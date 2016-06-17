@@ -1,0 +1,14 @@
+module-name:
+    ServiceWizard
+
+module-description:
+    The Wizard of KBase SDK services.
+
+service-language:
+    python
+
+module-version:
+    0.3.0
+
+owners:
+    [msneddon, kkeller, rsutormin, sjyoo]
