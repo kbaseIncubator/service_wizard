@@ -15,6 +15,7 @@ from urlparse import urlparse
 import base64
 import hashlib
 
+import requests
 
 from biokbase.catalog.Client import Catalog
 #END_HEADER
@@ -37,7 +38,7 @@ class ServiceWizard:
     #########################################
     VERSION = "0.3.0"
     GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "1979e95ba54db9fe1b346042163648c7b80d139c"
+    GIT_COMMIT_HASH = "06af9449348b068783095f45f319012fb99ce040"
     
     #BEGIN_CLASS_HEADER
 
@@ -90,34 +91,45 @@ class ServiceWizard:
                       access_key=self.RANCHER_ACCESS_KEY,
                       secret_key=self.RANCHER_SECRET_KEY)
 
-        stacks = rancher.list_environment(name=service_name)
+        stacks = rancher.list_environment(name=self.get_stack_name(module_version))
 
         # there should be only one stack, but what if there is more than one?
-        if (len(stacks) > 0):
-            exportConfigURL=stacks[0]['actions']['exportconfig']
+        is_new_stack = False
+        if (stacks is None or len(stacks) == 0):
+            is_new_stack = True
 
-            payload = {'serviceIds':[]}
-            configReq = requests.post(exportConfigURL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False)
-            export=configReq.json()
-            docker_compose = yaml.load(export['dockerComposeConfig'])
-            rancher_compose = yaml.load(export['rancherComposeConfig'])
-        else:
-            docker_compose = {}
-            rancher_compose = {}
+        docker_compose = {}
+        rancher_compose = {}
 
         docker_compose[dns_service_name] = {
                 "image" : "rancher/dns-service",
                 "links" : [ service_name+':'+service_name ]
             }
         docker_compose[service_name] = {
-                "image" : module_version['docker_img_name']
+                "image" : module_version['docker_img_name'],
+                "labels" : {
+                    'us.kbase.module.version':module_version['version'],
+                    'us.kbase.module.git_commit_hash':module_version['git_commit_hash']
+                }
             }
 
         rancher_compose[service_name] = {
                 "scale" : 1
             }
 
-        return docker_compose, rancher_compose
+        return docker_compose, rancher_compose, is_new_stack
+
+    def set_stack_description(self, module_version):
+        pprint('setting stack description')
+        rancher = gdapi.Client(url=self.RANCHER_URL,access_key=self.RANCHER_ACCESS_KEY,secret_key=self.RANCHER_SECRET_KEY)
+        stacks = rancher.list_environment(name=self.get_stack_name(module_version))
+        pprint(len(stacks))
+        pprint(module_version)
+        if (len(stacks) > 0):
+            exportConfigURL=stacks[0]['actions']['update']
+            payload = {'description': module_version['git_url'] }
+            x = requests.put(exportConfigURL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False)
+
 
     def get_service_url(self, module_version):
         url = "https://{0}:{1}/dynserv/{3}.{2}"
@@ -275,7 +287,7 @@ class ServiceWizard:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
 
         # Construct the docker compose and rancher compose file
-        docker_compose, rancher_compose = self.create_compose_files(mv)
+        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv)
 
         # To do: try to use API to send docker-compose directly instead of needing to write to disk
         ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
@@ -315,7 +327,17 @@ class ServiceWizard:
         if p.returncode != 0:
             raise ValueError('Unable to start service: Error was: \n' + stdout);
 
+        # if it is a new stack, then set a description string
+        if is_new_stack:
+            self.set_stack_description(mv)
+
         status = self.get_single_service_status(mv)
+        # if there is some delay in starting up, then give it a couple seconds
+        for trys in range(0,5):
+            if status is None or status['up']!=1:
+                time.sleep(2)
+                status = self.get_single_service_status(mv)
+            else: break
 
         #END start
 
@@ -371,7 +393,7 @@ class ServiceWizard:
         if mv['dynamic_service'] != 1:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
         
-        docker_compose, rancher_compose = self.create_compose_files(mv)
+        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv)
 
         ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
         os.makedirs(ymlpath)
@@ -617,6 +639,34 @@ class ServiceWizard:
                              'status is not type dict as required.')
         # return the results
         return [status]
+
+    def get_service_log(self, ctx, service):
+        """
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceLog" -> structure: parameter "log"
+           of String
+        """
+        # ctx is the context object
+        # return variables are: log
+        #BEGIN get_service_log
+        #END get_service_log
+
+        # At some point might do deeper type checking...
+        if not isinstance(log, dict):
+            raise ValueError('Method get_service_log return value ' +
+                             'log is not type dict as required.')
+        # return the results
+        return [log]
 
     def status(self, ctx):
         #BEGIN_STATUS

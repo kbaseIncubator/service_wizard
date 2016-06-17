@@ -12,6 +12,7 @@ eval {
     $get_time = sub { Time::HiRes::gettimeofday() };
 };
 
+use Bio::KBase::AuthToken;
 
 # Client version should match Impl version
 # This is a Semantic Version number,
@@ -74,6 +75,20 @@ sub new
 	push(@{$self->{headers}}, 'Kbrpc-Errordest', $self->{kbrpc_error_dest});
     }
 
+    #
+    # This module requires authentication.
+    #
+    # We create an auth token, passing through the arguments that we were (hopefully) given.
+
+    {
+	my $token = Bio::KBase::AuthToken->new(@args);
+	
+	if (!$token->error_message)
+	{
+	    $self->{token} = $token->token;
+	    $self->{client}->{token} = $token->token;
+	}
+    }
 
     my $ua = $self->{client}->ua;	 
     my $timeout = $ENV{CDMI_TIMEOUT} || (30 * 60);	 
@@ -706,6 +721,97 @@ boolean is an int
     }
 }
  
+
+
+=head2 get_service_log
+
+  $log = $obj->get_service_log($service)
+
+=over 4
+
+=item Parameter and return types
+
+=begin html
+
+<pre>
+$service is a ServiceWizard.Service
+$log is a ServiceWizard.ServiceLog
+Service is a reference to a hash where the following keys are defined:
+	module_name has a value which is a string
+	version has a value which is a string
+ServiceLog is a reference to a hash where the following keys are defined:
+	log has a value which is a string
+
+</pre>
+
+=end html
+
+=begin text
+
+$service is a ServiceWizard.Service
+$log is a ServiceWizard.ServiceLog
+Service is a reference to a hash where the following keys are defined:
+	module_name has a value which is a string
+	version has a value which is a string
+ServiceLog is a reference to a hash where the following keys are defined:
+	log has a value which is a string
+
+
+=end text
+
+=item Description
+
+
+
+=back
+
+=cut
+
+ sub get_service_log
+{
+    my($self, @args) = @_;
+
+# Authentication: required
+
+    if ((my $n = @args) != 1)
+    {
+	Bio::KBase::Exceptions::ArgumentValidationError->throw(error =>
+							       "Invalid argument count for function get_service_log (received $n, expecting 1)");
+    }
+    {
+	my($service) = @args;
+
+	my @_bad_arguments;
+        (ref($service) eq 'HASH') or push(@_bad_arguments, "Invalid type for argument 1 \"service\" (value was \"$service\")");
+        if (@_bad_arguments) {
+	    my $msg = "Invalid arguments passed to get_service_log:\n" . join("", map { "\t$_\n" } @_bad_arguments);
+	    Bio::KBase::Exceptions::ArgumentValidationError->throw(error => $msg,
+								   method_name => 'get_service_log');
+	}
+    }
+
+    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
+	method => "ServiceWizard.get_service_log",
+	params => \@args,
+    });
+    if ($result) {
+	if ($result->is_error) {
+	    Bio::KBase::Exceptions::JSONRPC->throw(error => $result->error_message,
+					       code => $result->content->{error}->{code},
+					       method_name => 'get_service_log',
+					       data => $result->content->{error}->{error} # JSON::RPC::ReturnObject only supports JSONRPC 1.1 or 1.O
+					      );
+	} else {
+	    return wantarray ? @{$result->result} : $result->result->[0];
+	}
+    } else {
+        Bio::KBase::Exceptions::HTTP->throw(error => "Error invoking method get_service_log",
+					    status_line => $self->{client}->status_line,
+					    method_name => 'get_service_log',
+				       );
+    }
+}
+ 
   
 
 sub version {
@@ -719,16 +825,16 @@ sub version {
             Bio::KBase::Exceptions::JSONRPC->throw(
                 error => $result->error_message,
                 code => $result->content->{code},
-                method_name => 'get_service_status_without_restart',
+                method_name => 'get_service_log',
             );
         } else {
             return wantarray ? @{$result->result} : $result->result->[0];
         }
     } else {
         Bio::KBase::Exceptions::HTTP->throw(
-            error => "Error invoking method get_service_status_without_restart",
+            error => "Error invoking method get_service_log",
             status_line => $self->{client}->status_line,
-            method_name => 'get_service_status_without_restart',
+            method_name => 'get_service_log',
         );
     }
 }
@@ -931,6 +1037,36 @@ module_names has a value which is a reference to a list where each element is a 
 a reference to a hash where the following keys are defined:
 is_up has a value which is a ServiceWizard.boolean
 module_names has a value which is a reference to a list where each element is a string
+
+
+=end text
+
+=back
+
+
+
+=head2 ServiceLog
+
+=over 4
+
+
+
+=item Definition
+
+=begin html
+
+<pre>
+a reference to a hash where the following keys are defined:
+log has a value which is a string
+
+</pre>
+
+=end html
+
+=begin text
+
+a reference to a hash where the following keys are defined:
+log has a value which is a string
 
 
 =end text

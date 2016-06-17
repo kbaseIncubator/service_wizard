@@ -209,3 +209,23 @@ class ServiceWizard(object):
         return self._client.call_method(
             'ServiceWizard.get_service_status_without_restart',
             [service], self._service_ver, context)
+
+    def get_service_log(self, service, context=None):
+        """
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceLog" -> structure: parameter "log"
+           of String
+        """
+        return self._client.call_method(
+            'ServiceWizard.get_service_log',
+            [service], self._service_ver, context)

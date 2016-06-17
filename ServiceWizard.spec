@@ -96,4 +96,11 @@ module ServiceWizard {
 
     funcdef get_service_status_without_restart(Service service) returns (ServiceStatus status);
 
+
+    typedef structure {
+        string log;
+    } ServiceLog;
+
+    funcdef get_service_log(Service service) returns (ServiceLog log) authentication required;
+
 };

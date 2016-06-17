@@ -10,6 +10,7 @@ import us.kbase.auth.AuthToken;
 import us.kbase.common.service.JsonClientCaller;
 import us.kbase.common.service.JsonClientException;
 import us.kbase.common.service.RpcContext;
+import us.kbase.common.service.UnauthorizedException;
 
 /**
  * <p>Original spec-file module name: ServiceWizard</p>
@@ -25,6 +26,35 @@ public class ServiceWizardClient {
      */
     public ServiceWizardClient(URL url) {
         caller = new JsonClientCaller(url);
+    }
+    /** Constructs a client with a custom URL.
+     * @param url the URL of the service.
+     * @param token the user's authorization token.
+     * @throws UnauthorizedException if the token is not valid.
+     * @throws IOException if an IOException occurs when checking the token's
+     * validity.
+     */
+    public ServiceWizardClient(URL url, AuthToken token) throws UnauthorizedException, IOException {
+        caller = new JsonClientCaller(url, token);
+    }
+
+    /** Constructs a client with a custom URL.
+     * @param url the URL of the service.
+     * @param user the user name.
+     * @param password the password for the user name.
+     * @throws UnauthorizedException if the credentials are not valid.
+     * @throws IOException if an IOException occurs when checking the user's
+     * credentials.
+     */
+    public ServiceWizardClient(URL url, String user, String password) throws UnauthorizedException, IOException {
+        caller = new JsonClientCaller(url, user, password);
+    }
+
+    /** Get the token this client uses to communicate with the server.
+     * @return the authorization token.
+     */
+    public AuthToken getToken() {
+        return caller.getToken();
     }
 
     /** Get the URL of the service with which this client communicates.
@@ -216,6 +246,23 @@ public class ServiceWizardClient {
         args.add(service);
         TypeReference<List<ServiceStatus>> retType = new TypeReference<List<ServiceStatus>>() {};
         List<ServiceStatus> res = caller.jsonrpcCall("ServiceWizard.get_service_status_without_restart", args, retType, true, false, jsonRpcContext);
+        return res.get(0);
+    }
+
+    /**
+     * <p>Original spec-file function name: get_service_log</p>
+     * <pre>
+     * </pre>
+     * @param   service   instance of type {@link us.kbase.servicewizard.Service Service}
+     * @return   parameter "log" of type {@link us.kbase.servicewizard.ServiceLog ServiceLog}
+     * @throws IOException if an IO exception occurs
+     * @throws JsonClientException if a JSON RPC exception occurs
+     */
+    public ServiceLog getServiceLog(Service service, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+        List<Object> args = new ArrayList<Object>();
+        args.add(service);
+        TypeReference<List<ServiceLog>> retType = new TypeReference<List<ServiceLog>>() {};
+        List<ServiceLog> res = caller.jsonrpcCall("ServiceWizard.get_service_log", args, retType, true, true, jsonRpcContext);
         return res.get(0);
     }
 }
