@@ -201,4 +201,21 @@ public class ServiceWizardClient {
         List<ServiceStatus> res = caller.jsonrpcCall("ServiceWizard.get_service_status", args, retType, true, false, jsonRpcContext);
         return res.get(0);
     }
+
+    /**
+     * <p>Original spec-file function name: get_service_status_without_restart</p>
+     * <pre>
+     * </pre>
+     * @param   service   instance of type {@link us.kbase.servicewizard.Service Service}
+     * @return   parameter "status" of type {@link us.kbase.servicewizard.ServiceStatus ServiceStatus}
+     * @throws IOException if an IO exception occurs
+     * @throws JsonClientException if a JSON RPC exception occurs
+     */
+    public ServiceStatus getServiceStatusWithoutRestart(Service service, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+        List<Object> args = new ArrayList<Object>();
+        args.add(service);
+        TypeReference<List<ServiceStatus>> retType = new TypeReference<List<ServiceStatus>>() {};
+        List<ServiceStatus> res = caller.jsonrpcCall("ServiceWizard.get_service_status_without_restart", args, retType, true, false, jsonRpcContext);
+        return res.get(0);
+    }
 }

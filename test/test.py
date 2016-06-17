@@ -115,6 +115,18 @@ for s in status_list:
     if s['module_name']=='HelloService' and 'dev' in s['release_tags']:
         if(s['up']!=1): print('!!!!!!!!!!!!!!!!!!!!FAIL!!!!!!!!!!!!!!!!!!!!!!\n\n');
 
+print('====\startup the other one too')
+status = wiz.start(ctx,{'module_name':'helloservice','version':'beta'})[0]
+pprint(status)
+if(status['up']!=1): print('!!!!!!!!!!!!!!!!!!!!FAIL!!!!!!!!!!!!!!!!!!!!!!\n\n');
+status_list = wiz.list_service_status(ctx,{})[0]
+pprint(status_list)
+for s in status_list:
+    if s['module_name']=='HelloService' and 'beta' in s['release_tags']:
+        if(s['up']!=1): print('!!!!!!!!!!!!!!!!!!!!FAIL!!!!!!!!!!!!!!!!!!!!!!\n\n');
+    if s['module_name']=='HelloService' and 'dev' in s['release_tags']:
+        if(s['up']!=1): print('!!!!!!!!!!!!!!!!!!!!FAIL!!!!!!!!!!!!!!!!!!!!!!\n\n');
+
 
 
 

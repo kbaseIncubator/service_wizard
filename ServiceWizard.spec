@@ -93,4 +93,7 @@ module ServiceWizard {
     */
     funcdef get_service_status(Service service) returns (ServiceStatus status);
 
+
+    funcdef get_service_status_without_restart(Service service) returns (ServiceStatus status);
+
 };

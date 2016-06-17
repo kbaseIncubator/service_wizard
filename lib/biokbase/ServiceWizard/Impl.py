@@ -37,7 +37,7 @@ class ServiceWizard:
     #########################################
     VERSION = "0.3.0"
     GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "7d347d99a2f708b14590c5dd1cb40ee29df702b2"
+    GIT_COMMIT_HASH = "1979e95ba54db9fe1b346042163648c7b80d139c"
     
     #BEGIN_CLASS_HEADER
 
@@ -565,6 +565,55 @@ class ServiceWizard:
         # At some point might do deeper type checking...
         if not isinstance(status, dict):
             raise ValueError('Method get_service_status return value ' +
+                             'status is not type dict as required.')
+        # return the results
+        return [status]
+
+    def get_service_status_without_restart(self, ctx, service):
+        """
+        :param service: instance of type "Service" (module_name - the name of
+           the service module, case-insensitive version     - specify the
+           service version, which can be either: (1) full git commit hash of
+           the module version (2) semantic version or semantic version
+           specification Note: semantic version lookup will only work for
+           released versions of the module. (3) release tag, which is one of:
+           dev | beta | release This information is always fetched from the
+           Catalog, so for more details on specifying the version, see the
+           Catalog documentation for the get_module_version method.) ->
+           structure: parameter "module_name" of String, parameter "version"
+           of String
+        :returns: instance of type "ServiceStatus" (module_name     - name of
+           the service module version         - semantic version number of
+           the service module git_commit_hash - git commit hash of the
+           service module release_tags    - list of release tags currently
+           for this service module (dev/beta/release) url             - the
+           url of the service up              - 1 if the service is up, 0
+           otherwise status          - status of the service as reported by
+           rancher health          - health of the service as reported by
+           Rancher TODO: add something to return: string
+           last_request_timestamp;) -> structure: parameter "module_name" of
+           String, parameter "version" of String, parameter "git_commit_hash"
+           of String, parameter "release_tags" of list of String, parameter
+           "hash" of String, parameter "url" of String, parameter "up" of
+           type "boolean", parameter "status" of String, parameter "health"
+           of String
+        """
+        # ctx is the context object
+        # return variables are: status
+        #BEGIN get_service_status_without_restart
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+
+        status = self.get_single_service_status(mv)
+        #END get_service_status_without_restart
+
+        # At some point might do deeper type checking...
+        if not isinstance(status, dict):
+            raise ValueError('Method get_service_status_without_restart return value ' +
                              'status is not type dict as required.')
         # return the results
         return [status]

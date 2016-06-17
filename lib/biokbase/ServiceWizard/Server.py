@@ -340,6 +340,9 @@ class Application(object):
         self.rpc_service.add(impl_ServiceWizard.get_service_status,
                              name='ServiceWizard.get_service_status',
                              types=[dict])
+        self.rpc_service.add(impl_ServiceWizard.get_service_status_without_restart,
+                             name='ServiceWizard.get_service_status_without_restart',
+                             types=[dict])
         self.rpc_service.add(impl_ServiceWizard.status,
                              name='ServiceWizard.status',
                              types=[dict])
