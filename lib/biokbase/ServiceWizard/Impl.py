@@ -40,7 +40,7 @@ class ServiceWizard:
     #########################################
     VERSION = "0.3.0"
     GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "4c61efe440d895e9a54cd8932643603143295713"
+    GIT_COMMIT_HASH = "7ce70ba16d70429ee6fea6cddd914abea4fb4dec"
     
     #BEGIN_CLASS_HEADER
 
@@ -747,15 +747,6 @@ class ServiceWizard:
                     break
             logs.append({'instance_id':i['id'], 'log':lines })
 
-
-#print "Sending 'Hello, World'..."
-#ws.send("Hello, World")
-#print "Sent"
-#print "Reeiving..."
-#print "Received '%s'" % result
-#ws.close()
-
-
         #END get_service_log
 
         # At some point might do deeper type checking...
@@ -764,6 +755,96 @@ class ServiceWizard:
                              'logs is not type list as required.')
         # return the results
         return [logs]
+
+    def get_service_log_web_socket(self, ctx, params):
+        """
+        returns connection info for a websocket connection to get realtime service logs
+        :param params: instance of type "GetServiceLogParams" (optional
+           instance_id to get logs for a specific instance.  Otherwise logs
+           from all instances are returned, TODO: add line number
+           constraints.) -> structure: parameter "service" of type "Service"
+           (module_name - the name of the service module, case-insensitive
+           version     - specify the service version, which can be either:
+           (1) full git commit hash of the module version (2) semantic
+           version or semantic version specification Note: semantic version
+           lookup will only work for released versions of the module. (3)
+           release tag, which is one of: dev | beta | release This
+           information is always fetched from the Catalog, so for more
+           details on specifying the version, see the Catalog documentation
+           for the get_module_version method.) -> structure: parameter
+           "module_name" of String, parameter "version" of String, parameter
+           "instance_id" of String
+        :returns: instance of list of type "ServiceLogWebSocket" ->
+           structure: parameter "instance_id" of String, parameter
+           "socket_url" of String
+        """
+        # ctx is the context object
+        # return variables are: sockets
+        #BEGIN get_service_log_web_socket
+        service = params['service']
+        user_id = ctx['user_id']
+        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        module = cc.get_module_info({'module_name' : service['module_name']})
+        has_access = False
+        for o in module['owners']:
+            if o == user_id:
+                has_access = True
+        if not has_access:
+            if cc.is_admin(user_id)==1:
+                has_access = True
+
+        if not has_access:
+            raise ValueError('Only module owners and catalog admins can view service logs.')
+
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+
+        rancher = gdapi.Client(url=self.RANCHER_URL,
+                      access_key=self.RANCHER_ACCESS_KEY,
+                      secret_key=self.RANCHER_SECRET_KEY)
+
+        #service_info = rancher.list_servicess(name=self.get_service_name(mv))
+
+        GET_SERVICE_URL = self.RANCHER_URL + '/v1/services?name=' + self.get_service_name(mv) + '&include=instances'
+        service_info = requests.get(GET_SERVICE_URL, auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False).json()
+
+        if len(service_info['data'])==0:
+            raise ValueError('Unable to fetch service information.  That service version may not be available.')
+
+        if len(service_info['data'][0]['instances'])==0:
+            raise ValueError('The service version specified has no available container instances.')
+
+        instances = service_info['data'][0]['instances']
+
+        #pprint(instances)
+
+        match_instance_id = False
+        if 'instance_id' in params:
+            match_instance_id = True
+
+        sockets = []
+        for i in instances:
+            if match_instance_id and params['instance_id']!=i['id']:
+                continue;
+            LOG_URL = i['actions']['logs']
+            payload = { 'follow':True }
+            log_ws = requests.post(LOG_URL, data = json.dumps(payload), auth=(self.RANCHER_ACCESS_KEY,self.RANCHER_SECRET_KEY),verify=False).json()
+            sockets.append({
+                    'instance_id':i['id'],
+                    'socket_url':log_ws['url'] + '?token=' + log_ws['token']
+                })
+        
+        #END get_service_log_web_socket
+
+        # At some point might do deeper type checking...
+        if not isinstance(sockets, list):
+            raise ValueError('Method get_service_log_web_socket return value ' +
+                             'sockets is not type list as required.')
+        # return the results
+        return [sockets]
 
     def status(self, ctx):
         #BEGIN_STATUS

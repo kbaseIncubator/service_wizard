@@ -234,3 +234,29 @@ class ServiceWizard(object):
         return self._client.call_method(
             'ServiceWizard.get_service_log',
             [params], self._service_ver, context)
+
+    def get_service_log_web_socket(self, params, context=None):
+        """
+        returns connection info for a websocket connection to get realtime service logs
+        :param params: instance of type "GetServiceLogParams" (optional
+           instance_id to get logs for a specific instance.  Otherwise logs
+           from all instances are returned, TODO: add line number
+           constraints.) -> structure: parameter "service" of type "Service"
+           (module_name - the name of the service module, case-insensitive
+           version     - specify the service version, which can be either:
+           (1) full git commit hash of the module version (2) semantic
+           version or semantic version specification Note: semantic version
+           lookup will only work for released versions of the module. (3)
+           release tag, which is one of: dev | beta | release This
+           information is always fetched from the Catalog, so for more
+           details on specifying the version, see the Catalog documentation
+           for the get_module_version method.) -> structure: parameter
+           "module_name" of String, parameter "version" of String, parameter
+           "instance_id" of String
+        :returns: instance of list of type "ServiceLogWebSocket" ->
+           structure: parameter "instance_id" of String, parameter
+           "socket_url" of String
+        """
+        return self._client.call_method(
+            'ServiceWizard.get_service_log_web_socket',
+            [params], self._service_ver, context)
