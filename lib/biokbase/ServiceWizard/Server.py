@@ -355,6 +355,10 @@ class Application(object):
                              name='ServiceWizard.get_service_log',
                              types=[dict])
         self.method_authentication['ServiceWizard.get_service_log'] = 'required'
+        self.rpc_service.add(impl_ServiceWizard.get_service_log_web_socket,
+                             name='ServiceWizard.get_service_log_web_socket',
+                             types=[dict])
+        self.method_authentication['ServiceWizard.get_service_log_web_socket'] = 'required'
         self.rpc_service.add(impl_ServiceWizard.status,
                              name='ServiceWizard.status',
                              types=[dict])

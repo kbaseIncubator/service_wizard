@@ -265,4 +265,22 @@ public class ServiceWizardClient {
         List<List<ServiceLog>> res = caller.jsonrpcCall("ServiceWizard.get_service_log", args, retType, true, true, jsonRpcContext);
         return res.get(0);
     }
+
+    /**
+     * <p>Original spec-file function name: get_service_log_web_socket</p>
+     * <pre>
+     * returns connection info for a websocket connection to get realtime service logs
+     * </pre>
+     * @param   params   instance of type {@link us.kbase.servicewizard.GetServiceLogParams GetServiceLogParams}
+     * @return   parameter "sockets" of list of type {@link us.kbase.servicewizard.ServiceLogWebSocket ServiceLogWebSocket}
+     * @throws IOException if an IO exception occurs
+     * @throws JsonClientException if a JSON RPC exception occurs
+     */
+    public List<ServiceLogWebSocket> getServiceLogWebSocket(GetServiceLogParams params, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+        List<Object> args = new ArrayList<Object>();
+        args.add(params);
+        TypeReference<List<List<ServiceLogWebSocket>>> retType = new TypeReference<List<List<ServiceLogWebSocket>>>() {};
+        List<List<ServiceLogWebSocket>> res = caller.jsonrpcCall("ServiceWizard.get_service_log_web_socket", args, retType, true, true, jsonRpcContext);
+        return res.get(0);
+    }
 }

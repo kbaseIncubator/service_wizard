@@ -820,6 +820,105 @@ ServiceLog is a reference to a hash where the following keys are defined:
     }
 }
  
+
+
+=head2 get_service_log_web_socket
+
+  $sockets = $obj->get_service_log_web_socket($params)
+
+=over 4
+
+=item Parameter and return types
+
+=begin html
+
+<pre>
+$params is a ServiceWizard.GetServiceLogParams
+$sockets is a reference to a list where each element is a ServiceWizard.ServiceLogWebSocket
+GetServiceLogParams is a reference to a hash where the following keys are defined:
+	service has a value which is a ServiceWizard.Service
+	instance_id has a value which is a string
+Service is a reference to a hash where the following keys are defined:
+	module_name has a value which is a string
+	version has a value which is a string
+ServiceLogWebSocket is a reference to a hash where the following keys are defined:
+	instance_id has a value which is a string
+	socket_url has a value which is a string
+
+</pre>
+
+=end html
+
+=begin text
+
+$params is a ServiceWizard.GetServiceLogParams
+$sockets is a reference to a list where each element is a ServiceWizard.ServiceLogWebSocket
+GetServiceLogParams is a reference to a hash where the following keys are defined:
+	service has a value which is a ServiceWizard.Service
+	instance_id has a value which is a string
+Service is a reference to a hash where the following keys are defined:
+	module_name has a value which is a string
+	version has a value which is a string
+ServiceLogWebSocket is a reference to a hash where the following keys are defined:
+	instance_id has a value which is a string
+	socket_url has a value which is a string
+
+
+=end text
+
+=item Description
+
+returns connection info for a websocket connection to get realtime service logs
+
+=back
+
+=cut
+
+ sub get_service_log_web_socket
+{
+    my($self, @args) = @_;
+
+# Authentication: required
+
+    if ((my $n = @args) != 1)
+    {
+	Bio::KBase::Exceptions::ArgumentValidationError->throw(error =>
+							       "Invalid argument count for function get_service_log_web_socket (received $n, expecting 1)");
+    }
+    {
+	my($params) = @args;
+
+	my @_bad_arguments;
+        (ref($params) eq 'HASH') or push(@_bad_arguments, "Invalid type for argument 1 \"params\" (value was \"$params\")");
+        if (@_bad_arguments) {
+	    my $msg = "Invalid arguments passed to get_service_log_web_socket:\n" . join("", map { "\t$_\n" } @_bad_arguments);
+	    Bio::KBase::Exceptions::ArgumentValidationError->throw(error => $msg,
+								   method_name => 'get_service_log_web_socket');
+	}
+    }
+
+    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
+	method => "ServiceWizard.get_service_log_web_socket",
+	params => \@args,
+    });
+    if ($result) {
+	if ($result->is_error) {
+	    Bio::KBase::Exceptions::JSONRPC->throw(error => $result->error_message,
+					       code => $result->content->{error}->{code},
+					       method_name => 'get_service_log_web_socket',
+					       data => $result->content->{error}->{error} # JSON::RPC::ReturnObject only supports JSONRPC 1.1 or 1.O
+					      );
+	} else {
+	    return wantarray ? @{$result->result} : $result->result->[0];
+	}
+    } else {
+        Bio::KBase::Exceptions::HTTP->throw(error => "Error invoking method get_service_log_web_socket",
+					    status_line => $self->{client}->status_line,
+					    method_name => 'get_service_log_web_socket',
+				       );
+    }
+}
+ 
   
 
 sub version {
@@ -833,16 +932,16 @@ sub version {
             Bio::KBase::Exceptions::JSONRPC->throw(
                 error => $result->error_message,
                 code => $result->content->{code},
-                method_name => 'get_service_log',
+                method_name => 'get_service_log_web_socket',
             );
         } else {
             return wantarray ? @{$result->result} : $result->result->[0];
         }
     } else {
         Bio::KBase::Exceptions::HTTP->throw(
-            error => "Error invoking method get_service_log",
+            error => "Error invoking method get_service_log_web_socket",
             status_line => $self->{client}->status_line,
-            method_name => 'get_service_log',
+            method_name => 'get_service_log_web_socket',
         );
     }
 }
@@ -1115,6 +1214,38 @@ instance_id has a value which is a string
 a reference to a hash where the following keys are defined:
 service has a value which is a ServiceWizard.Service
 instance_id has a value which is a string
+
+
+=end text
+
+=back
+
+
+
+=head2 ServiceLogWebSocket
+
+=over 4
+
+
+
+=item Definition
+
+=begin html
+
+<pre>
+a reference to a hash where the following keys are defined:
+instance_id has a value which is a string
+socket_url has a value which is a string
+
+</pre>
+
+=end html
+
+=begin text
+
+a reference to a hash where the following keys are defined:
+instance_id has a value which is a string
+socket_url has a value which is a string
 
 
 =end text

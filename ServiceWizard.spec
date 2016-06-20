@@ -111,4 +111,13 @@ module ServiceWizard {
 
     funcdef get_service_log(GetServiceLogParams params) returns (list<ServiceLog> logs) authentication required;
 
+
+    typedef structure{
+        string instance_id;
+        string socket_url;
+    } ServiceLogWebSocket;
+
+    /* returns connection info for a websocket connection to get realtime service logs */
+    funcdef get_service_log_web_socket(GetServiceLogParams params) returns (list <ServiceLogWebSocket> sockets) authentication required;
+
 };
