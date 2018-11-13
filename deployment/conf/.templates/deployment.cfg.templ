@@ -1,0 +1,23 @@
+[ServiceWizard]
+kbase-endpoint = {{ default .Env.kbase_endpoint "https://ci.kbase.us/services" }}
+job-service-url = {{ default .Env.job_service_url "https://ci.kbase.us/services/ujs"}}
+workspace-url = {{ default .Env.workspace_url "https://ci.kbase.us/services/ws" }}
+shock-url = {{ default .Env.shock_url "https://ci.kbase.us/services/shock" }}
+handle-service-url = {{ default .Env.kbase_endpoint "https://ci.kbase.us/services" }}/handle_service
+rancher-compose-bin = {{ default .Env.rancher_compose_bin "/kb/deployment/bin/rancher-compose"  }}
+scratch = /kb/module/work/tmp
+catalog-url = {{ default .Env.catalog_url "" }}
+docker-registry-url = {{ default .Env.docker_registry_url "" }}
+rancher-env-url = {{ default .Env.rancher_env_url "" }}
+access-key = {{ default .Env.access_key "" }}
+secret-key = {{ default .Env.secret_key "" }}
+nginx-port = {{ default .Env.nginx_port "443" }}
+
+# Configuration for server (uwsgi) variables
+service-port = {{ default .Env.service_port "5000" }}
+http-timeout = {{ default .Env.http_timeout "600" }}
+processes = {{ default .Env.processes "20" }}
+threads = {{ default .Env.threads "4" }}
+cheaper = {{ default .Env.cheaper "4" }}
+
+temp-dir = {{ default .Env.temp_dir "/tmp" }} 
